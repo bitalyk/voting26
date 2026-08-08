@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>QR Code Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+    <div class="bg-white p-8 rounded-lg shadow-md max-w-md w-full text-center">
+        <h1 class="text-2xl font-bold mb-4 text-gray-800">Voting QR Code</h1>
+        <p class="text-sm text-gray-500 mb-2">Auth Key: <span class="font-mono font-bold text-indigo-600"><%= authKey %></span></p>
+        
+        <div class="flex justify-center mb-6">
+            <img src="<%= qrCodeDataUrl %>" alt="QR Code" class="w-64 h-64 border p-2 rounded-md" />
+        </div>
+
+        <input type="text" id="voteUrlInput" readonly value="<%= voteUrl %>" class="w-full p-2 border rounded mb-4 text-xs font-mono bg-gray-50">
+        
+        <div class="flex gap-2">
+            <button onclick="copyLink()" id="copyBtn" class="w-full bg-indigo-600 text-white py-2 rounded font-medium hover:bg-indigo-700">Copy Link</button>
+            <a href="/qr" class="w-full bg-gray-600 text-white py-2 rounded font-medium hover:bg-gray-700 block text-center">New QR</a>
+        </div>
+    </div>
+
+    <script>
+        function copyLink() {
+            const copyText = document.getElementById("voteUrlInput");
+            copyText.select();
+            navigator.clipboard.writeText(copyText.value);
+            const btn = document.getElementById("copyBtn");
+            btn.innerText = "Copied!";
+            setTimeout(() => btn.innerText = "Copy Link", 2000);
+        }
+    </script>
+</body>
+</html>

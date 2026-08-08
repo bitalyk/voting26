@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Cast Your Vote</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 py-10 px-4">
+    <div class="max-w-xl mx-auto bg-white p-6 rounded-lg shadow">
+        <h1 class="text-2xl font-bold mb-6 text-gray-800 text-center">Event Voting</h1>
+
+        <form action="/vote/submit" method="POST" class="space-y-6">
+            <input type="hidden" name="key" value="<%= key %>">
+
+            <% Object.keys(categories).forEach(catId => { %>
+                <div class="border p-4 rounded-md">
+                    <h2 class="font-semibold text-lg text-indigo-600 mb-3"><%= categories[catId].name %></h2>
+                    <div class="space-y-2">
+                        <% categories[catId].items.forEach(item => { %>
+                            <label class="flex items-center space-x-3 p-2 border rounded hover:bg-gray-50 cursor-pointer">
+                                <input type="radio" name="cat<%= catId %>" value="<%= item.id %>" required class="form-radio text-indigo-600">
+                                <span class="text-gray-700 font-medium"><%= item.name %></span>
+                            </label>
+                        <% }) %>
+                    </div>
+                </div>
+            <% }) %>
+
+            <button type="submit" class="w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700">Submit Votes</button>
+        </form>
+    </div>
+</body>
+</html>

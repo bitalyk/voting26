@@ -1,0 +1,16 @@
+{
+  "name": "qr-voting-system",
+  "version": "1.0.0",
+  "description": "3-category voting system with 12-character random auth keys, QR generation, and MongoDB",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "ejs": "^3.1.9",
+    "express": "^4.19.2",
+    "mongoose": "^8.3.0",
+    "qrcode": "^1.5.3"
+  }
+}
