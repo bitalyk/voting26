@@ -67,7 +67,9 @@ app.use((error, req, res, next) => {
 });
 
 app.use((req, res) => {
-    res.status(404).render('error', { message: 'The requested page could not be found.' });
+    const requestedLanguage = String(req.query.lang || '').toLowerCase();
+    const lang = ['en', 'ru', 'ro'].includes(requestedLanguage) ? requestedLanguage : 'en';
+    res.status(404).render('error', { message: 'The requested page could not be found.', lang });
 });
 
 mongoose.connect(MONGO_URI)

@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Manage Prizes</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>body { background: #0b1220; color: #e2e8f0; }</style>
+</head>
+<body class="min-h-screen antialiased">
+  <main class="mx-auto max-w-4xl px-4 py-8">
+    <header class="mb-6 flex items-center justify-between gap-4">
+      <div><a href="/admin" class="text-sm text-sky-400">Settings</a><h1 class="mt-1 text-3xl font-bold text-white">Prizes</h1></div>
+      <button id="openCreateModal" type="button" class="rounded-lg bg-amber-400 px-4 py-2.5 font-bold text-slate-950">Add Prize</button>
+    </header>
+
+    <section class="space-y-3">
+      <% if (!prizes.length) { %><p class="rounded-xl border border-dashed border-slate-600 p-5 text-slate-300">No prizes have been created.</p><% } %>
+      <% prizes.forEach((prize) => { %>
+        <article class="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-700 bg-slate-900 p-4 shadow-lg">
+          <div class="flex min-w-0 items-center gap-3">
+            <span class="h-14 w-14 shrink-0 rounded-lg border border-white/20" style="background-color: <%= prize.color %>;"></span>
+            <div><h2 class="font-bold text-white"><%= prize.name.en || prize.name.ru || prize.name.ro || 'Untitled prize' %></h2><p class="mt-1 text-xs text-slate-400">ID: <%= prize.prizeId %> | Remaining: <%= prize.amount %> | <%= prize.color %></p></div>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button type="button" class="edit-prize rounded-lg border border-slate-500 px-3 py-2 text-sm font-semibold" data-id="<%= prize.prizeId %>" data-name-en="<%= prize.name.en || '' %>" data-name-ru="<%= prize.name.ru || '' %>" data-name-ro="<%= prize.name.ro || '' %>" data-amount="<%= prize.amount %>" data-color="<%= prize.color %>">Edit</button>
+            <form method="POST" action="/admin/prizes/<%= encodeURIComponent(prize.prizeId) %>/delete" onsubmit="return confirm('Delete this prize?');"><button class="rounded-lg border border-red-500/50 px-3 py-2 text-sm font-semibold text-red-200">Delete</button></form>
+          </div>
+        </article>
+      <% }) %>
+    </section>
+  </main>
+
+  <div id="createModal" class="fixed inset-0 hidden items-center justify-center bg-slate-950/75 p-4">
+    <form method="POST" action="/admin/prizes" class="w-full max-w-lg rounded-xl border border-slate-700 bg-slate-900 p-5 shadow-2xl">
+      <div class="flex items-center justify-between"><h2 class="text-xl font-bold text-white">Add prize</h2><button type="button" data-close-modal="createModal" class="text-slate-300">Close</button></div>
+      <div class="mt-5 grid gap-3">
+        <label class="text-sm">Name (English)<input name="nameEn" required class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white" /></label>
+        <label class="text-sm">Name (Russian)<input name="nameRu" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white" /></label>
+        <label class="text-sm">Name (Romanian)<input name="nameRo" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white" /></label>
+        <label class="text-sm">Initial quantity<input name="amount" type="number" min="0" step="1" required class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white" /></label>
+        <label class="text-sm">Slice color<input name="color" type="color" value="#38bdf8" class="mt-1 block h-10 w-full rounded-lg border border-slate-600 bg-slate-800 p-1" /></label>
+        <button class="mt-2 rounded-lg bg-emerald-400 px-4 py-2.5 font-bold text-slate-950">Create prize</button>
+      </div>
+    </form>
+  </div>
+
+  <div id="editModal" class="fixed inset-0 hidden items-center justify-center bg-slate-950/75 p-4">
+    <form id="editPrizeForm" method="POST" class="w-full max-w-lg rounded-xl border border-slate-700 bg-slate-900 p-5 shadow-2xl">
+      <div class="flex items-center justify-between"><h2 class="text-xl font-bold text-white">Edit prize</h2><button type="button" data-close-modal="editModal" class="text-slate-300">Close</button></div>
+      <p id="editPrizeId" class="mt-2 text-sm text-slate-400"></p>
+      <div class="mt-5 grid gap-3">
+        <label class="text-sm">Name (English)<input id="editNameEn" name="nameEn" required class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white" /></label>
+        <label class="text-sm">Name (Russian)<input id="editNameRu" name="nameRu" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white" /></label>
+        <label class="text-sm">Name (Romanian)<input id="editNameRo" name="nameRo" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white" /></label>
+        <label class="text-sm">Remaining quantity<input id="editAmount" name="amount" type="number" min="0" step="1" required class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white" /></label>
+        <label class="text-sm">Slice color<input id="editColor" name="color" type="color" class="mt-1 block h-10 w-full rounded-lg border border-slate-600 bg-slate-800 p-1" /></label>
+        <button class="mt-2 rounded-lg bg-emerald-400 px-4 py-2.5 font-bold text-slate-950">Save prize</button>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    const showModal = (id) => document.getElementById(id).classList.replace('hidden', 'flex');
+    const hideModal = (id) => document.getElementById(id).classList.replace('flex', 'hidden');
+    document.getElementById('openCreateModal').onclick = () => showModal('createModal');
+    document.querySelectorAll('[data-close-modal]').forEach((button) => button.onclick = () => hideModal(button.dataset.closeModal));
+    document.querySelectorAll('.edit-prize').forEach((button) => button.onclick = () => {
+      document.getElementById('editPrizeForm').action = `/admin/prizes/${encodeURIComponent(button.dataset.id)}/update`;
+      document.getElementById('editPrizeId').textContent = `Prize ID: ${button.dataset.id}`;
+      document.getElementById('editNameEn').value = button.dataset.nameEn;
+      document.getElementById('editNameRu').value = button.dataset.nameRu;
+      document.getElementById('editNameRo').value = button.dataset.nameRo;
+      document.getElementById('editAmount').value = button.dataset.amount;
+      document.getElementById('editColor').value = button.dataset.color;
+      showModal('editModal');
+    });
+  </script>
+</body>
+</html>

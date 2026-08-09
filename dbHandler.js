@@ -29,17 +29,34 @@ const candidateSchema = new Schema({
     votes: { type: Number, default: 0 }
 }, { timestamps: true });
 
+const wonPrizeSchema = new Schema({
+    prizeId: { type: String, required: true },
+    name: { type: Schema.Types.Mixed, required: true },
+    wonAt: { type: Date, default: Date.now }
+}, { _id: false });
+
+const prizeSchema = new Schema({
+    prizeId: { type: String, required: true, unique: true, index: true },
+    name: { type: Schema.Types.Mixed, default: {} },
+    amount: { type: Number, required: true, min: 0, default: 0 },
+    color: { type: String, default: '#38bdf8' },
+    createdAt: { type: Date, default: Date.now }
+}, { timestamps: true });
+
 const telegramUserSchema = new Schema({
     telegramId: { type: String, required: true, unique: true, index: true },
     username: { type: String, default: '' },
     voted: { type: Boolean, default: false },
     votedAt: { type: Date },
-    languageCode: { type: String, default: 'en' }
+    languageCode: { type: String, default: 'en' },
+    allowedPrizes: { type: Boolean, default: false },
+    wonPrizes: { type: [wonPrizeSchema], default: [] }
 }, { timestamps: true });
 
 const Settings = mongoose.model('Settings', settingsSchema);
 const Category = mongoose.model('Category', categorySchema);
 const Candidate = mongoose.model('Candidate', candidateSchema);
+const Prize = mongoose.model('Prize', prizeSchema);
 const TelegramUser = mongoose.model('TelegramUser', telegramUserSchema);
 
 async function generateUniqueFiveDigitId(Model, fieldName) {
@@ -117,6 +134,45 @@ function resolveLocalizedText(value, fallback = 'en') {
     }
 
     return String(value);
+}
+
+function normalizePrizeName(value) {
+    if (typeof value === 'string') {
+        const name = value.trim();
+        if (!name) {
+            throw new Error('Prize name is required.');
+        }
+        return { en: name, ru: name, ro: name };
+    }
+
+    const name = {
+        en: String(value && value.en || '').trim(),
+        ru: String(value && value.ru || '').trim(),
+        ro: String(value && value.ro || '').trim()
+    };
+    if (!name.en && !name.ru && !name.ro) {
+        throw new Error('Prize name is required.');
+    }
+    name.en = name.en || name.ru || name.ro;
+    name.ru = name.ru || name.en;
+    name.ro = name.ro || name.en;
+    return name;
+}
+
+function normalizePrizeAmount(value) {
+    const amount = Number(value);
+    if (!Number.isInteger(amount) || amount < 0) {
+        throw new Error('Prize quantity must be a whole number of zero or greater.');
+    }
+    return amount;
+}
+
+function normalizePrizeColor(value) {
+    const color = String(value || '').trim();
+    if (!/^#[0-9a-fA-F]{6}$/.test(color)) {
+        throw new Error('Prize color must be a six-digit hex color.');
+    }
+    return color;
 }
 
 async function seedDatabaseDefaults() {
@@ -346,6 +402,113 @@ module.exports = {
 
         await candidate.deleteOne();
         return true;
+    },
+
+    getPrizes: async function getPrizes() {
+        return Prize.find({}).sort({ createdAt: 1 }).lean();
+    },
+
+    getActivePrizes: async function getActivePrizes() {
+        return Prize.find({ amount: { $gt: 0 } }).sort({ createdAt: 1 }).lean();
+    },
+
+    createPrize: async function createPrize(payload = {}) {
+        const prize = await Prize.create({
+            prizeId: await generateUniqueFiveDigitId(Prize, 'prizeId'),
+            name: normalizePrizeName(payload.name),
+            amount: normalizePrizeAmount(payload.amount),
+            color: normalizePrizeColor(payload.color)
+        });
+        return prize.toObject();
+    },
+
+    updatePrize: async function updatePrize(prizeId, payload = {}) {
+        const prize = await Prize.findOne({ prizeId });
+        if (!prize) {
+            return null;
+        }
+
+        if (payload.name !== undefined) prize.name = normalizePrizeName(payload.name);
+        if (payload.amount !== undefined) prize.amount = normalizePrizeAmount(payload.amount);
+        if (payload.color !== undefined) prize.color = normalizePrizeColor(payload.color);
+        await prize.save();
+        return prize.toObject();
+    },
+
+    deletePrize: async function deletePrize(prizeId) {
+        const result = await Prize.deleteOne({ prizeId });
+        return result.deletedCount === 1;
+    },
+
+    getTelegramUsers: async function getTelegramUsers() {
+        return TelegramUser.find({}).sort({ createdAt: -1 }).lean();
+    },
+
+    updateTelegramUserPrizePermission: async function updateTelegramUserPrizePermission(telegramId, allowedPrizes) {
+        const user = await TelegramUser.findOneAndUpdate(
+            { telegramId: String(telegramId) },
+            { $set: { allowedPrizes: Boolean(allowedPrizes) } },
+            { new: true }
+        );
+        return user ? user.toObject() : null;
+    },
+
+    spinPrizes: async function spinPrizes(telegramId, requestedSpinCount) {
+        const spinCount = Number(requestedSpinCount);
+        if (![1, 5, 10].includes(spinCount)) {
+            return { success: false, error: 'Choose 1, 5, or 10 spins.' };
+        }
+
+        const user = await TelegramUser.findOne({ telegramId: String(telegramId) }).lean();
+        if (!user || !user.allowedPrizes) {
+            return { success: false, error: 'Prize access is not enabled for this account.' };
+        }
+
+        const wins = [];
+        for (let index = 0; index < spinCount; index += 1) {
+            let claimedPrize = null;
+
+            // A concurrent spin may claim the selected prize first, so retry with a fresh pool.
+            for (let attempt = 0; attempt < 10 && !claimedPrize; attempt += 1) {
+                const activePrizes = await Prize.find({ amount: { $gt: 0 } }).lean();
+                const totalPool = activePrizes.reduce((total, prize) => total + prize.amount, 0);
+                if (totalPool === 0) break;
+
+                let target = crypto.randomInt(totalPool);
+                let selectedPrize = activePrizes[activePrizes.length - 1];
+                for (const prize of activePrizes) {
+                    target -= prize.amount;
+                    if (target < 0) {
+                        selectedPrize = prize;
+                        break;
+                    }
+                }
+
+                claimedPrize = await Prize.findOneAndUpdate(
+                    { prizeId: selectedPrize.prizeId, amount: { $gt: 0 } },
+                    { $inc: { amount: -1 } },
+                    { new: true }
+                ).lean();
+            }
+
+            if (!claimedPrize) break;
+
+            const wonAt = new Date();
+            const win = { prizeId: claimedPrize.prizeId, name: claimedPrize.name, wonAt };
+            const prizeHistoryResult = await TelegramUser.updateOne(
+                { _id: user._id, allowedPrizes: true },
+                { $push: { wonPrizes: win } }
+            );
+            if (prizeHistoryResult.matchedCount !== 1) {
+                await Prize.updateOne({ prizeId: claimedPrize.prizeId }, { $inc: { amount: 1 } });
+                break;
+            }
+            wins.push(win);
+        }
+
+        return wins.length > 0
+            ? { success: true, wins, availableSpins: wins.length }
+            : { success: false, error: 'No prizes are currently available.' };
     },
 
     getOrCreateTelegramUser: async function getOrCreateTelegramUser(telegramId, username = '', languageCode = 'en') {

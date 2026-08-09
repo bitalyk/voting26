@@ -6,13 +6,13 @@ const router = express.Router();
 const LANGUAGES = ['en', 'ru', 'ro'];
 const I18N = {
     en: {
-        eventTitle: 'GoCon Voting Event', eventSubtitle: 'Choose your favorite projects and help shape the final results.', startVoting: 'Start Voting', soon: 'Soon...', votingOpen: 'Voting is open now', countdownLabel: 'Voting starts in', authPrompt: 'Please open this application inside Telegram to participate.', openTelegram: 'Open in Telegram', close: 'Close', leaderboardTitle: 'Leaderboard', resultsLocked: 'Results are not ready yet.', resultsNotReady: 'Results are not ready yet.', alreadyVoted: 'Already voted', selectOptionEach: 'Please select one option in each category before submitting.', userHello: 'Welcome', timerDays: 'Days', timerHours: 'Hours', timerMinutes: 'Minutes', timerSeconds: 'Seconds', categoryLabel: 'Select one', votingNotStarted: 'Voting will start soon', home: 'Home', submitVote: 'Submit vote', noDescription: 'No description provided yet.', telegramOnly: 'This page must be opened inside Telegram.', voteFailed: 'Vote submission failed.', topThree: 'Top 3', noVotes: 'No votes recorded yet.', votes: 'votes'
+        eventTitle: 'GoCon Voting Event', eventSubtitle: 'Choose your favorite projects and help shape the final results.', eventLabel: 'Event', startVoting: 'Start Voting', soon: 'Soon...', votingOpen: 'Voting is open now', countdownLabel: 'Voting starts in', authPrompt: 'Please open this application inside Telegram to participate.', openTelegram: 'Open in Telegram', close: 'Close', leaderboardTitle: 'Leaderboard', resultsLabel: 'Results', resultsLocked: 'Results are not ready yet.', resultsNotReady: 'Results are not ready yet.', alreadyVoted: 'Already voted', selectOptionEach: 'Please select one option in each category before submitting.', userHello: 'Welcome', timerDays: 'Days', timerHours: 'Hours', timerMinutes: 'Minutes', timerSeconds: 'Seconds', categoryLabel: 'Select one', votingNotStarted: 'Voting will start soon', home: 'Home', submitVote: 'Submit vote', voteNow: 'Vote now', noDescription: 'No description provided yet.', telegramOnly: 'This page must be opened inside Telegram.', voteFailed: 'Vote submission failed.', topThree: 'Top 3', noVotes: 'No votes recorded yet.', votes: 'votes', prizeWheel: 'Prize Wheel', noPrizesAvailable: 'There are no prizes available right now.', spin: 'Spin', selectingPrizes: 'Selecting prizes...', spinning: 'Spinning...', telegramSpinOnly: 'Open this page inside Telegram to spin.', prizeWon: 'Prize won', yourPrizes: 'Your prizes', claimPrize: 'Close / Claim', youWon: 'You won', language: 'Language', accessDenied: 'Access denied', notice: 'Notice', viewLeaderboard: 'View Leaderboard'
     },
     ru: {
-        eventTitle: 'Голосование GoCon', eventSubtitle: 'Выберите любимые проекты и помогите сформировать итоговые результаты.', startVoting: 'Начать голосование', soon: 'Скоро...', votingOpen: 'Голосование уже открыто', countdownLabel: 'Голосование начнётся через', authPrompt: 'Пожалуйста, откройте это приложение внутри Telegram, чтобы принять участие.', openTelegram: 'Открыть в Telegram', close: 'Закрыть', leaderboardTitle: 'Лидерборд', resultsLocked: 'Результаты ещё не готовы.', resultsNotReady: 'Результаты ещё не готовы.', alreadyVoted: 'Вы уже проголосовали', selectOptionEach: 'Пожалуйста, выберите по одному варианту в каждой категории.', userHello: 'Добро пожаловать', timerDays: 'Дней', timerHours: 'Часов', timerMinutes: 'Минут', timerSeconds: 'Секунд', categoryLabel: 'Выберите один', votingNotStarted: 'Голосование скоро начнётся', home: 'Главная', submitVote: 'Отправить голос', noDescription: 'Описание пока не добавлено.', telegramOnly: 'Эта страница должна быть открыта внутри Telegram.', voteFailed: 'Не удалось отправить голос.', topThree: 'Топ 3', noVotes: 'Голоса ещё не зарегистрированы.', votes: 'голосов'
+        eventTitle: 'Голосование GoCon', eventSubtitle: 'Выберите любимые проекты и помогите сформировать итоговые результаты.', eventLabel: 'Событие', startVoting: 'Начать голосование', soon: 'Скоро...', votingOpen: 'Голосование уже открыто', countdownLabel: 'Голосование начнётся через', authPrompt: 'Пожалуйста, откройте это приложение внутри Telegram, чтобы принять участие.', openTelegram: 'Открыть в Telegram', close: 'Закрыть', leaderboardTitle: 'Лидерборд', resultsLabel: 'Результаты', resultsLocked: 'Результаты ещё не готовы.', resultsNotReady: 'Результаты ещё не готовы.', alreadyVoted: 'Вы уже проголосовали', selectOptionEach: 'Пожалуйста, выберите по одному варианту в каждой категории.', userHello: 'Добро пожаловать', timerDays: 'Дней', timerHours: 'Часов', timerMinutes: 'Минут', timerSeconds: 'Секунд', categoryLabel: 'Выберите один', votingNotStarted: 'Голосование скоро начнётся', home: 'Главная', submitVote: 'Отправить голос', voteNow: 'Голосовать', noDescription: 'Описание пока не добавлено.', telegramOnly: 'Эта страница должна быть открыта внутри Telegram.', voteFailed: 'Не удалось отправить голос.', topThree: 'Топ 3', noVotes: 'Голоса ещё не зарегистрированы.', votes: 'голосов', prizeWheel: 'Колесо призов', noPrizesAvailable: 'Сейчас нет доступных призов.', spin: 'Крутить', selectingPrizes: 'Выбираем призы...', spinning: 'Крутим...', telegramSpinOnly: 'Откройте эту страницу в Telegram, чтобы крутить колесо.', prizeWon: 'Приз получен', yourPrizes: 'Ваши призы', claimPrize: 'Закрыть / Забрать', youWon: 'Вы выиграли', language: 'Язык', accessDenied: 'Доступ запрещён', notice: 'Уведомление', viewLeaderboard: 'Открыть лидерборд'
     },
     ro: {
-        eventTitle: 'Votarea GoCon', eventSubtitle: 'Alege proiectele preferate și ajută la stabilirea rezultatelor finale.', startVoting: 'Începe votul', soon: 'În curând...', votingOpen: 'Votul este deschis acum', countdownLabel: 'Votul începe în', authPrompt: 'Deschide această aplicație în Telegram pentru a participa.', openTelegram: 'Deschide în Telegram', close: 'Închide', leaderboardTitle: 'Clasament', resultsLocked: 'Rezultatele nu sunt gata încă.', resultsNotReady: 'Rezultatele nu sunt gata încă.', alreadyVoted: 'Ai votat deja', selectOptionEach: 'Selectează câte o opțiune în fiecare categorie înainte de a trimite.', userHello: 'Bun venit', timerDays: 'Zile', timerHours: 'Ore', timerMinutes: 'Minute', timerSeconds: 'Secunde', categoryLabel: 'Alege unul', votingNotStarted: 'Votul va începe în curând', home: 'Acasă', submitVote: 'Trimite votul', noDescription: 'Descrierea nu este disponibilă încă.', telegramOnly: 'Această pagină trebuie deschisă în Telegram.', voteFailed: 'Trimiterea votului a eșuat.', topThree: 'Top 3', noVotes: 'Nu există voturi încă.', votes: 'voturi'
+        eventTitle: 'Votarea GoCon', eventSubtitle: 'Alege proiectele preferate și ajută la stabilirea rezultatelor finale.', eventLabel: 'Eveniment', startVoting: 'Începe votul', soon: 'În curând...', votingOpen: 'Votul este deschis acum', countdownLabel: 'Votul începe în', authPrompt: 'Deschide această aplicație în Telegram pentru a participa.', openTelegram: 'Deschide în Telegram', close: 'Închide', leaderboardTitle: 'Clasament', resultsLabel: 'Rezultate', resultsLocked: 'Rezultatele nu sunt gata încă.', resultsNotReady: 'Rezultatele nu sunt gata încă.', alreadyVoted: 'Ai votat deja', selectOptionEach: 'Selectează câte o opțiune în fiecare categorie înainte de a trimite.', userHello: 'Bun venit', timerDays: 'Zile', timerHours: 'Ore', timerMinutes: 'Minute', timerSeconds: 'Secunde', categoryLabel: 'Alege unul', votingNotStarted: 'Votul va începe în curând', home: 'Acasă', submitVote: 'Trimite votul', voteNow: 'Votează', noDescription: 'Descrierea nu este disponibilă încă.', telegramOnly: 'Această pagină trebuie deschisă în Telegram.', voteFailed: 'Trimiterea votului a eșuat.', topThree: 'Top 3', noVotes: 'Nu există voturi încă.', votes: 'voturi', prizeWheel: 'Roata premiilor', noPrizesAvailable: 'Nu există premii disponibile acum.', spin: 'Învârte', selectingPrizes: 'Se aleg premiile...', spinning: 'Se învârte...', telegramSpinOnly: 'Deschide această pagină în Telegram pentru a învârti roata.', prizeWon: 'Premiu câștigat', yourPrizes: 'Premiile tale', claimPrize: 'Închide / Revendică', youWon: 'Ai câștigat', language: 'Limbă', accessDenied: 'Acces interzis', notice: 'Notificare', viewLeaderboard: 'Vezi clasamentul'
     }
 };
 
@@ -79,7 +79,10 @@ router.get('/', asyncRoute(async (req, res) => {
 
 router.get('/vote', asyncRoute(async (req, res) => {
     const settings = await dbHandler.getSettings();
-    if (!settings.allowTestVoting && Date.now() < new Date(settings.votingStartTimestamp).getTime()) return res.status(403).render('error', { message: 'Voting is not open yet.' });
+    if (!settings.allowTestVoting && Date.now() < new Date(settings.votingStartTimestamp).getTime()) {
+        const context = getPageContext(req);
+        return res.status(403).render('error', { ...context, message: context.t.votingNotStarted });
+    }
     const [categories, candidates] = await Promise.all([dbHandler.getCategories(), dbHandler.getCandidates()]);
     const byCategory = new Map();
     candidates.forEach((candidate) => byCategory.set(candidate.categoryId, [...(byCategory.get(candidate.categoryId) || []), candidate]));
@@ -95,17 +98,42 @@ router.get('/leaderboard', asyncRoute(async (req, res) => {
     renderPublic(req, res, 'leaderboard', { settings, isLocked, countdown: isLocked ? getCountdownParts(showAt) : null, categoryResults: leaderboard.categoryResults.map((category) => ({ ...category, categoryName: dbHandler.resolveLocalizedText(category.name, lang) })) });
 }));
 
+router.get('/prizes', asyncRoute(async (req, res) => {
+    const telegramId = req.session && req.session.telegramUserId;
+    if (!telegramId) {
+        const context = getPageContext(req);
+        return res.status(403).render('error', { ...context, message: context.t.telegramSpinOnly });
+    }
+    const status = await dbHandler.getTelegramUserStatus(telegramId);
+    if (!status.valid || !status.data.allowedPrizes) {
+        const context = getPageContext(req);
+        return res.status(403).render('error', { ...context, message: context.t.accessDenied });
+    }
+    const { lang } = getPageContext(req);
+    const prizes = (await dbHandler.getActivePrizes()).map((prize) => ({ ...prize, displayName: dbHandler.resolveLocalizedText(prize.name, lang) }));
+    renderPublic(req, res, 'prizes', { prizes });
+}));
+
 router.post('/api/telegram-auth', asyncRoute(async (req, res) => {
     const verification = verifyTelegramInitData(req.body && req.body.initData);
     if (!verification.valid) return res.status(401).json({ success: false, error: verification.error });
     const user = await dbHandler.getOrCreateTelegramUser(verification.user.id, verification.user.username || verification.user.first_name, verification.user.language_code);
-    res.json({ success: true, voted: Boolean(user.voted), user: { id: user.telegramId, username: user.username, languageCode: user.languageCode } });
+    req.session.telegramUserId = user.telegramId;
+    res.json({ success: true, voted: Boolean(user.voted), allowedPrizes: Boolean(user.allowedPrizes), user: { id: user.telegramId, username: user.username, languageCode: user.languageCode } });
 }));
 
 router.post('/api/telegram-vote', asyncRoute(async (req, res) => {
     const verification = verifyTelegramInitData(req.body && req.body.initData);
     if (!verification.valid) return res.status(401).json({ success: false, error: verification.error });
     const result = await dbHandler.submitTelegramVote(verification.user.id, req.body && req.body.categoryVotes, verification.user);
+    res.status(result.success ? 200 : 400).json(result);
+}));
+
+router.post('/api/prizes/spin', asyncRoute(async (req, res) => {
+    const verification = verifyTelegramInitData(req.body && req.body.initData);
+    if (!verification.valid) return res.status(401).json({ success: false, error: verification.error });
+    req.session.telegramUserId = String(verification.user.id);
+    const result = await dbHandler.spinPrizes(verification.user.id, req.body && req.body.spinCount);
     res.status(result.success ? 200 : 400).json(result);
 }));
 
@@ -120,10 +148,31 @@ router.post('/admin/login', (req, res) => {
 });
 router.post('/admin/logout', adminGuard, (req, res) => req.session.destroy(() => res.redirect('/admin/login')));
 
-router.get('/admin', adminGuard, asyncRoute(async (req, res) => res.render('admin-settings', { ...getPageContext(req), isLoggedIn: true, settings: await dbHandler.getSettings(), errorMessage: '' })));
+router.get('/admin', adminGuard, asyncRoute(async (req, res) => {
+    const [settings, users] = await Promise.all([dbHandler.getSettings(), dbHandler.getTelegramUsers()]);
+    res.render('admin-settings', { ...getPageContext(req), isLoggedIn: true, settings, users, errorMessage: '' });
+}));
 router.post('/admin/settings', adminGuard, asyncRoute(async (req, res) => {
     await dbHandler.updateSettings({ votingStartTimestamp: req.body.votingStartTimestamp, leaderboardShowTimestamp: req.body.leaderboardShowTimestamp, showSoonText: req.body.showSoonText === 'on', allowTestVoting: req.body.allowTestVoting === 'on', allowTestLeaderboard: req.body.allowTestLeaderboard === 'on' });
     res.redirect('/admin');
+}));
+router.post('/admin/users/:telegramId/prize-permission', adminGuard, asyncRoute(async (req, res) => {
+    await dbHandler.updateTelegramUserPrizePermission(req.params.telegramId, req.body.allowedPrizes === 'true');
+    res.redirect('/admin');
+}));
+
+router.get('/admin/prizes', adminGuard, asyncRoute(async (req, res) => res.render('admin-prizes', { ...getPageContext(req), prizes: await dbHandler.getPrizes() })));
+router.post('/admin/prizes', adminGuard, asyncRoute(async (req, res) => {
+    await dbHandler.createPrize({ name: { en: req.body.nameEn, ru: req.body.nameRu, ro: req.body.nameRo }, amount: req.body.amount, color: req.body.color });
+    res.redirect('/admin/prizes');
+}));
+router.post('/admin/prizes/:prizeId/update', adminGuard, asyncRoute(async (req, res) => {
+    await dbHandler.updatePrize(req.params.prizeId, { name: { en: req.body.nameEn, ru: req.body.nameRu, ro: req.body.nameRo }, amount: req.body.amount, color: req.body.color });
+    res.redirect('/admin/prizes');
+}));
+router.post('/admin/prizes/:prizeId/delete', adminGuard, asyncRoute(async (req, res) => {
+    await dbHandler.deletePrize(req.params.prizeId);
+    res.redirect('/admin/prizes');
 }));
 
 router.get('/admin/categories', adminGuard, asyncRoute(async (req, res) => res.render('admin-categories', { ...getPageContext(req), categories: await dbHandler.getCategories() })));
