@@ -1,33 +1,144 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="<%= lang %>">
 <head>
-    <meta charset="UTF-8">
-    <title>Cast Your Vote</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Vote</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    body {
+      background: linear-gradient(180deg, #020617 0%, #111827 100%);
+      color: #e2e8f0;
+    }
+    .candidate-card {
+      transition: all 0.18s ease;
+    }
+    .candidate-card.selected {
+      border-color: rgba(56, 189, 248, 0.9);
+      background: rgba(14, 116, 144, 0.12);
+      box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.25);
+    }
+  </style>
 </head>
-<body class="bg-gray-50 py-10 px-4">
-    <div class="max-w-xl mx-auto bg-white p-6 rounded-lg shadow">
-        <h1 class="text-2xl font-bold mb-6 text-gray-800 text-center">Event Voting</h1>
+<body class="min-h-screen antialiased">
+  <div class="mx-auto max-w-md px-4 py-5">
+    <header class="mb-5 rounded-3xl border border-slate-700 bg-slate-900/80 p-4 shadow-2xl shadow-sky-900/20">
+      <div class="flex items-center justify-between gap-3">
+        <div>
+          <p class="text-[10px] font-semibold uppercase tracking-[0.22em] text-sky-400">Vote</p>
+          <h1 class="mt-1 text-2xl font-bold text-white">GoCon Voting</h1>
+        </div>
+        <a href="/" class="rounded-full border border-slate-600 px-3 py-1 text-xs font-medium text-slate-200">Home</a>
+      </div>
+    </header>
 
-        <form action="/vote/submit" method="POST" class="space-y-6">
-            <input type="hidden" name="key" value="<%= key %>">
+    <form id="voteForm" class="space-y-5">
+      <% categories.forEach((category) => { %>
+        <section class="rounded-3xl border border-slate-700 bg-slate-900/80 p-4 shadow-lg shadow-slate-950/30">
+          <div class="mb-3 flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3 min-w-0">
+              <% if (category.image) { %>
+                <img src="<%= category.image %>" alt="<%= category.displayName %>" class="h-12 w-12 rounded-xl object-cover border border-slate-600 bg-slate-800" />
+              <% } else { %>
+                <div class="flex h-12 w-12 items-center justify-center rounded-xl border border-slate-600 bg-slate-800 text-xs font-bold text-slate-200">#</div>
+              <% } %>
+              <h2 class="text-lg font-semibold text-white"><%= category.displayName %></h2>
+            </div>
+            <span class="rounded-full border border-slate-600 bg-slate-800 px-2 py-1 text-[10px] font-medium uppercase tracking-[0.2em] text-slate-300"><%= t.categoryLabel %></span>
+          </div>
 
-            <% Object.keys(categories).forEach(catId => { %>
-                <div class="border p-4 rounded-md">
-                    <h2 class="font-semibold text-lg text-indigo-600 mb-3"><%= categories[catId].name %></h2>
-                    <div class="space-y-2">
-                        <% categories[catId].items.forEach(item => { %>
-                            <label class="flex items-center space-x-3 p-2 border rounded hover:bg-gray-50 cursor-pointer">
-                                <input type="radio" name="cat<%= catId %>" value="<%= item.id %>" required class="form-radio text-indigo-600">
-                                <span class="text-gray-700 font-medium"><%= item.name %></span>
-                            </label>
-                        <% }) %>
-                    </div>
+          <div class="space-y-3">
+            <% category.candidates.forEach((candidate) => { %>
+              <label class="candidate-card flex cursor-pointer items-center gap-3 rounded-2xl border border-slate-700 bg-slate-800/60 p-3 text-left hover:border-sky-500/60 hover:bg-slate-800">
+                <input type="radio" name="<%= category.categoryId %>" value="<%= candidate.candidateId %>" class="h-4 w-4 accent-sky-500" required />
+                <% if (candidate.image) { %>
+                  <img src="<%= candidate.image %>" alt="<%= candidate.name %>" class="h-16 w-16 rounded-xl object-cover" />
+                <% } else { %>
+                  <div class="flex h-16 w-16 items-center justify-center rounded-xl bg-slate-700 text-lg font-bold text-slate-100"><%= candidate.code || candidate.name.charAt(0).toUpperCase() %></div>
+                <% } %>
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center justify-between gap-2">
+                    <strong class="block text-sm font-bold text-white"><%= candidate.name %></strong>
+                    <% if (candidate.code) { %>
+                      <span class="rounded-full border border-sky-500/40 bg-sky-500/10 px-2 py-1 text-[10px] font-semibold uppercase text-sky-200"><%= candidate.code %></span>
+                    <% } %>
+                  </div>
+                  <p class="mt-1 text-xs text-slate-300"><%= candidate.description || 'No description provided yet.' %></p>
                 </div>
+              </label>
             <% }) %>
+          </div>
+        </section>
+      <% }) %>
 
-            <button type="submit" class="w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700">Submit Votes</button>
-        </form>
-    </div>
+      <button id="submitVoteButton" type="submit" class="w-full rounded-2xl bg-emerald-500 px-4 py-3 text-base font-bold text-slate-950 shadow-lg shadow-emerald-500/20">Submit vote</button>
+    </form>
+  </div>
+
+  <script>
+    const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+    const voteForm = document.getElementById('voteForm');
+
+    const syncSelectionStyles = () => {
+      document.querySelectorAll('.candidate-card').forEach((card) => {
+        const input = card.querySelector('input[type="radio"]');
+        card.classList.toggle('selected', input && input.checked);
+      });
+    };
+
+    document.querySelectorAll('input[type="radio"]').forEach((input) => {
+      input.addEventListener('change', syncSelectionStyles);
+    });
+
+    voteForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      const payload = {};
+      const checkedInputs = Array.from(document.querySelectorAll('input[type="radio"]:checked'));
+
+      checkedInputs.forEach((input) => {
+        payload[input.name] = input.value;
+      });
+
+      const categoryGroups = Array.from(document.querySelectorAll('input[type="radio"]')).map((input) => input.name);
+      const missingSelection = categoryGroups.some((categoryKey, index) => {
+        return categoryKey && !checkedInputs.some((input) => input.name === categoryKey);
+      });
+
+      if (missingSelection) {
+        window.alert('Please select one option in each category before submitting.');
+        return;
+      }
+
+      if (!tg || !tg.initData) {
+        window.alert('This page must be opened inside Telegram.');
+        return;
+      }
+
+      const result = await fetch('/api/telegram-vote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ initData: tg.initData, categoryVotes: payload })
+      }).then((response) => response.json());
+
+      if (!result.success) {
+        window.alert(result.error || 'Vote submission failed.');
+        return;
+      }
+
+      window.location.href = '/leaderboard';
+    });
+
+    if (tg) {
+      tg.ready();
+      tg.expand();
+      if (tg.MainButton) {
+        tg.MainButton.setText('SUBMIT VOTE');
+        tg.MainButton.onClick(() => voteForm.requestSubmit());
+      }
+    }
+
+    syncSelectionStyles();
+  </script>
 </body>
 </html>
