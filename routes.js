@@ -1,490 +1,169 @@
 const crypto = require('crypto');
 const express = require('express');
-const router = express.Router();
 const dbHandler = require('./dbHandler');
 
+const router = express.Router();
 const LANGUAGES = ['en', 'ru', 'ro'];
 const I18N = {
     en: {
-        eventTitle: 'GoCon Voting Event',
-        eventSubtitle: 'Choose your favorite projects and help shape the final results.',
-        startVoting: 'Start Voting',
-        soon: 'Soon...',
-        votingOpen: 'Voting is open now',
-        countdownLabel: 'Voting starts in',
-        authPrompt: 'Please open this application inside Telegram to participate.',
-        openTelegram: 'Open in Telegram',
-        close: 'Close',
-        login: 'Admin Login',
-        password: 'Password',
-        leaderboardTitle: 'Leaderboard',
-        resultsSoon: 'Results available soon',
-        resultsLocked: 'Results are not ready yet.',
-        resultsNotReady: 'Results are not ready yet.',
-        viewHome: 'Back to home',
-        loading: 'Checking access…',
-        alreadyVoted: 'Already voted',
-        voteSuccess: 'Vote submitted successfully',
-        selectOptionEach: 'Please select one option in each category before submitting.',
-        userHello: 'Hello',
-        timerDays: 'Days',
-        timerHours: 'Hours',
-        timerMinutes: 'Minutes',
-        timerSeconds: 'Seconds',
-        voteNow: 'Vote now',
-        categoryLabel: 'Select one',
-        votingNotStarted: 'Voting will start soon'
+        eventTitle: 'GoCon Voting Event', eventSubtitle: 'Choose your favorite projects and help shape the final results.', startVoting: 'Start Voting', soon: 'Soon...', votingOpen: 'Voting is open now', countdownLabel: 'Voting starts in', authPrompt: 'Please open this application inside Telegram to participate.', openTelegram: 'Open in Telegram', close: 'Close', leaderboardTitle: 'Leaderboard', resultsLocked: 'Results are not ready yet.', resultsNotReady: 'Results are not ready yet.', alreadyVoted: 'Already voted', selectOptionEach: 'Please select one option in each category before submitting.', userHello: 'Welcome', timerDays: 'Days', timerHours: 'Hours', timerMinutes: 'Minutes', timerSeconds: 'Seconds', categoryLabel: 'Select one', votingNotStarted: 'Voting will start soon', home: 'Home', submitVote: 'Submit vote', noDescription: 'No description provided yet.', telegramOnly: 'This page must be opened inside Telegram.', voteFailed: 'Vote submission failed.', topThree: 'Top 3', noVotes: 'No votes recorded yet.', votes: 'votes'
     },
     ru: {
-        eventTitle: 'Голосование GoCon',
-        eventSubtitle: 'Выберите любимые проекты и помогите сформировать итоговые результаты.',
-        startVoting: 'Начать голосование',
-        soon: 'Скоро...',
-        votingOpen: 'Голосование уже открыто',
-        countdownLabel: 'Голосование начнётся через',
-        authPrompt: 'Пожалуйста, откройте это приложение внутри Telegram, чтобы принять участие.',
-        openTelegram: 'Открыть в Telegram',
-        close: 'Закрыть',
-        login: 'Вход администратора',
-        password: 'Пароль',
-        leaderboardTitle: 'Лидерборд',
-        resultsSoon: 'Результаты скоро будут доступны',
-        resultsLocked: 'Результаты ещё не готовы.',
-        resultsNotReady: 'Результаты ещё не готовы.',
-        viewHome: 'На главную',
-        loading: 'Проверяем доступ…',
-        alreadyVoted: 'Вы уже проголосовали',
-        voteSuccess: 'Голос успешно отправлен',
-        selectOptionEach: 'Пожалуйста, выберите по одному варианту в каждой категории.',
-        userHello: 'Привет',
-        timerDays: 'Дней',
-        timerHours: 'Часов',
-        timerMinutes: 'Минут',
-        timerSeconds: 'Секунд',
-        voteNow: 'Голосовать',
-        categoryLabel: 'Выберите один',
-        votingNotStarted: 'Голосование cкоро начнётся'
+        eventTitle: 'Голосование GoCon', eventSubtitle: 'Выберите любимые проекты и помогите сформировать итоговые результаты.', startVoting: 'Начать голосование', soon: 'Скоро...', votingOpen: 'Голосование уже открыто', countdownLabel: 'Голосование начнётся через', authPrompt: 'Пожалуйста, откройте это приложение внутри Telegram, чтобы принять участие.', openTelegram: 'Открыть в Telegram', close: 'Закрыть', leaderboardTitle: 'Лидерборд', resultsLocked: 'Результаты ещё не готовы.', resultsNotReady: 'Результаты ещё не готовы.', alreadyVoted: 'Вы уже проголосовали', selectOptionEach: 'Пожалуйста, выберите по одному варианту в каждой категории.', userHello: 'Добро пожаловать', timerDays: 'Дней', timerHours: 'Часов', timerMinutes: 'Минут', timerSeconds: 'Секунд', categoryLabel: 'Выберите один', votingNotStarted: 'Голосование скоро начнётся', home: 'Главная', submitVote: 'Отправить голос', noDescription: 'Описание пока не добавлено.', telegramOnly: 'Эта страница должна быть открыта внутри Telegram.', voteFailed: 'Не удалось отправить голос.', topThree: 'Топ 3', noVotes: 'Голоса ещё не зарегистрированы.', votes: 'голосов'
     },
     ro: {
-        eventTitle: 'Votarea GoCon',
-        eventSubtitle: 'Alege proiectele preferate și ajută la stabilirea rezultatelor finale.',
-        startVoting: 'Începe votul',
-        soon: 'În curând...',
-        votingOpen: 'Votul este deschis acum',
-        countdownLabel: 'Votul începe în',
-        authPrompt: 'Deschide această aplicație în Telegram pentru a participa.',
-        openTelegram: 'Deschide în Telegram',
-        close: 'Închide',
-        login: 'Autentificare administrator',
-        password: 'Parolă',
-        leaderboardTitle: 'Clasament',
-        resultsSoon: 'Rezultatele vor fi disponibile în curând',
-        resultsLocked: 'Rezultatele nu sunt gata încă.',
-        resultsNotReady: 'Rezultatele nu sunt gata încă.',
-        viewHome: 'Înapoi acasă',
-        loading: 'Verificăm accesul…',
-        alreadyVoted: 'Ați votat deja',
-        voteSuccess: 'Votul a fost trimis cu succes',
-        selectOptionEach: 'Selectează câte o opțiune în fiecare categorie înainte de a trimite.',
-        userHello: 'Salut',
-        timerDays: 'Zile',
-        timerHours: 'Ore',
-        timerMinutes: 'Minute',
-        timerSeconds: 'Secunde',
-        voteNow: 'Votează acum',
-        categoryLabel: 'Alege unul',
-        votingNotStarted: 'Votul va începe în curând'
+        eventTitle: 'Votarea GoCon', eventSubtitle: 'Alege proiectele preferate și ajută la stabilirea rezultatelor finale.', startVoting: 'Începe votul', soon: 'În curând...', votingOpen: 'Votul este deschis acum', countdownLabel: 'Votul începe în', authPrompt: 'Deschide această aplicație în Telegram pentru a participa.', openTelegram: 'Deschide în Telegram', close: 'Închide', leaderboardTitle: 'Clasament', resultsLocked: 'Rezultatele nu sunt gata încă.', resultsNotReady: 'Rezultatele nu sunt gata încă.', alreadyVoted: 'Ai votat deja', selectOptionEach: 'Selectează câte o opțiune în fiecare categorie înainte de a trimite.', userHello: 'Bun venit', timerDays: 'Zile', timerHours: 'Ore', timerMinutes: 'Minute', timerSeconds: 'Secunde', categoryLabel: 'Alege unul', votingNotStarted: 'Votul va începe în curând', home: 'Acasă', submitVote: 'Trimite votul', noDescription: 'Descrierea nu este disponibilă încă.', telegramOnly: 'Această pagină trebuie deschisă în Telegram.', voteFailed: 'Trimiterea votului a eșuat.', topThree: 'Top 3', noVotes: 'Nu există voturi încă.', votes: 'voturi'
     }
 };
 
+function readCookie(req, name) {
+    const entry = String(req.headers.cookie || '').split(';').find((cookie) => cookie.trim().startsWith(`${name}=`));
+    return entry ? decodeURIComponent(entry.split('=').slice(1).join('=').trim()) : '';
+}
+
 function getRequestLanguage(req) {
-    const value = String(req.query.lang || req.headers['x-language'] || '').trim().toLowerCase();
-    if (LANGUAGES.includes(value)) {
-        return value;
-    }
-
-    const acceptLanguage = String(req.headers['accept-language'] || '').split(',')[0].split('-')[0].trim().toLowerCase();
-    if (LANGUAGES.includes(acceptLanguage)) {
-        return acceptLanguage;
-    }
-
-    return 'en';
+    const requested = String(req.query.lang || readCookie(req, 'voting_lang') || '').toLowerCase();
+    if (LANGUAGES.includes(requested)) return requested;
+    const browserLanguage = String(req.headers['accept-language'] || '').split(',')[0].split('-')[0].toLowerCase();
+    return LANGUAGES.includes(browserLanguage) ? browserLanguage : 'en';
 }
 
 function getPageContext(req) {
     const lang = getRequestLanguage(req);
-    return {
-        lang,
-        t: I18N[lang] || I18N.en,
-        telegramBotUsername: process.env.TELEGRAM_BOT_USERNAME || 'your_bot_username'
-    };
+    return { lang, t: I18N[lang], telegramBotUsername: process.env.TELEGRAM_BOT_USERNAME || 'your_bot_username' };
+}
+
+function renderPublic(req, res, view, model = {}) {
+    const context = getPageContext(req);
+    res.cookie('voting_lang', context.lang, { maxAge: 31536000000, sameSite: 'lax' });
+    res.render(view, { ...context, ...model });
 }
 
 function getCountdownParts(targetTime) {
-    const distance = Math.max(targetTime - Date.now(), 0);
-    const totalSeconds = Math.floor(distance / 1000);
-    const days = Math.floor(totalSeconds / (60 * 60 * 24));
-    const hours = Math.floor((totalSeconds % (60 * 60 * 24)) / (60 * 60));
-    const minutes = Math.floor((totalSeconds % (60 * 60)) / 60);
-    const seconds = totalSeconds % 60;
-
-    return { days, hours, minutes, seconds, totalSeconds };
+    const totalSeconds = Math.floor(Math.max(targetTime - Date.now(), 0) / 1000);
+    return { days: Math.floor(totalSeconds / 86400), hours: Math.floor((totalSeconds % 86400) / 3600), minutes: Math.floor((totalSeconds % 3600) / 60), seconds: totalSeconds % 60 };
 }
 
 function verifyTelegramInitData(initData) {
     const botToken = process.env.TELEGRAM_BOT_TOKEN;
-
-    if (!botToken) {
-        return { valid: false, error: 'Telegram bot token is not configured on the server.' };
-    }
-
-    if (!initData || typeof initData !== 'string') {
-        return { valid: false, error: 'Missing Telegram init data.' };
-    }
-
+    if (!botToken || !initData || typeof initData !== 'string') return { valid: false, error: 'Missing Telegram authentication data.' };
     const params = new URLSearchParams(initData);
     const hash = params.get('hash');
-    const authDate = Number(params.get('auth_date') || 0);
-
-    if (!hash) {
-        return { valid: false, error: 'Telegram hash missing.' };
-    }
-
-    if (!Number.isFinite(authDate) || Date.now() / 1000 - authDate > 86400) {
-        return { valid: false, error: 'Telegram init data is expired.' };
-    }
-
-    const secretKey = crypto
-        .createHmac('sha256', 'WebAppData')
-        .update(botToken)
-        .digest();
-
-    const dataCheck = [];
-    for (const [key, value] of Array.from(params.entries()).sort(([a], [b]) => a.localeCompare(b))) {
-        if (key === 'hash') continue;
-        dataCheck.push(`${key}=${value}`);
-    }
-
-    const checkString = dataCheck.join('\n');
-    const expectedHash = crypto
-        .createHmac('sha256', secretKey)
-        .update(checkString)
-        .digest('hex');
-
-    const providedHash = hash.trim();
-    const expectedBuffer = Buffer.from(expectedHash, 'hex');
-    const providedBuffer = Buffer.from(providedHash, 'hex');
-
-    if (expectedBuffer.length !== providedBuffer.length) {
-        return { valid: false, error: 'Invalid Telegram signature.' };
-    }
-
-    const isValid = crypto.timingSafeEqual(expectedBuffer, providedBuffer);
-    if (!isValid) {
-        return { valid: false, error: 'Invalid Telegram signature.' };
-    }
-
-    const userString = params.get('user');
-    if (!userString) {
-        return { valid: false, error: 'Telegram user payload missing.' };
-    }
-
+    const authDate = Number(params.get('auth_date'));
+    if (!hash || !Number.isFinite(authDate) || Date.now() / 1000 - authDate > 86400) return { valid: false, error: 'Telegram authentication data is expired.' };
+    const checkString = Array.from(params.entries()).filter(([key]) => key !== 'hash').sort(([left], [right]) => left.localeCompare(right)).map(([key, value]) => `${key}=${value}`).join('\n');
+    const secret = crypto.createHmac('sha256', 'WebAppData').update(botToken).digest();
+    const expected = Buffer.from(crypto.createHmac('sha256', secret).update(checkString).digest('hex'), 'hex');
+    const received = Buffer.from(hash, 'hex');
+    if (expected.length !== received.length || !crypto.timingSafeEqual(expected, received)) return { valid: false, error: 'Invalid Telegram signature.' };
     try {
-        const user = JSON.parse(userString);
-        if (!user || !user.id) {
-            return { valid: false, error: 'Invalid Telegram user payload.' };
-        }
-        return { valid: true, user };
-    } catch (error) {
-        return { valid: false, error: 'Unable to parse Telegram user payload.' };
+        const user = JSON.parse(params.get('user'));
+        return user && user.id ? { valid: true, user } : { valid: false, error: 'Invalid Telegram user payload.' };
+    } catch {
+        return { valid: false, error: 'Invalid Telegram user payload.' };
     }
 }
 
-const adminGuard = (req, res, next) => {
-    if (req.session && req.session.isAdmin) {
-        return next();
-    }
-    return res.redirect('/admin/login');
-};
+const asyncRoute = (handler) => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
+const adminGuard = (req, res, next) => (req.session && req.session.isAdmin ? next() : res.redirect('/admin/login'));
+const uploadImage = (req, res, next) => req.app.locals.upload.single('image')(req, res, next);
+const imagePath = (req) => (req.file ? `/uploads/${req.file.filename}` : '');
+const categoryPath = (categoryId) => `/admin/categories/${encodeURIComponent(categoryId)}/candidates`;
 
-const applyUploadMiddleware = (req, res, next) => {
-    const upload = req.app && req.app.locals && req.app.locals.upload;
-    if (!upload) {
-        return next();
-    }
-    return upload.single('image')(req, res, next);
-};
-
-router.get('/', async (req, res) => {
+router.get('/', asyncRoute(async (req, res) => {
     const settings = await dbHandler.getSettings();
-    const langContext = getPageContext(req);
-    const startTimestamp = new Date(settings.votingStartTimestamp).getTime();
-    const votingOpen = settings.allowTestVoting === true || Date.now() >= startTimestamp;
-    const countdown = !settings.allowTestVoting && !settings.showSoonText && !votingOpen ? getCountdownParts(startTimestamp) : null;
+    const votingOpen = settings.allowTestVoting || Date.now() >= new Date(settings.votingStartTimestamp).getTime();
+    const countdown = !settings.allowTestVoting && !settings.showSoonText && !votingOpen ? getCountdownParts(new Date(settings.votingStartTimestamp).getTime()) : null;
+    renderPublic(req, res, 'index', { settings, votingOpen, countdown, showSoonText: Boolean(settings.showSoonText) });
+}));
 
-    res.render('index', {
-        ...langContext,
-        settings,
-        countdown,
-        showSoonText: Boolean(settings.showSoonText),
-        votingOpen
-    });
-});
-
-router.get('/vote', async (req, res) => {
-    const langContext = getPageContext(req);
+router.get('/vote', asyncRoute(async (req, res) => {
     const settings = await dbHandler.getSettings();
-    const categories = await dbHandler.getCategories();
-    const categoryIds = categories.map((category) => category.categoryId);
-    const candidates = await dbHandler.getCandidates();
+    if (!settings.allowTestVoting && Date.now() < new Date(settings.votingStartTimestamp).getTime()) return res.status(403).render('error', { message: 'Voting is not open yet.' });
+    const [categories, candidates] = await Promise.all([dbHandler.getCategories(), dbHandler.getCandidates()]);
+    const byCategory = new Map();
+    candidates.forEach((candidate) => byCategory.set(candidate.categoryId, [...(byCategory.get(candidate.categoryId) || []), candidate]));
+    const { lang } = getPageContext(req);
+    renderPublic(req, res, 'vote', { categories: categories.map((category) => ({ ...category, displayName: dbHandler.resolveLocalizedText(category.name, lang), candidates: byCategory.get(category.categoryId) || [] })) });
+}));
 
-    const votingStatus = settings.allowTestVoting === true ? { allowed: true } : { allowed: Date.now() >= new Date(settings.votingStartTimestamp).getTime() };
-    if (!votingStatus.allowed) {
-        return res.render('error', { message: 'Voting is not open yet. Please wait for the event start.' });
-    }
+router.get('/leaderboard', asyncRoute(async (req, res) => {
+    const [settings, leaderboard] = await Promise.all([dbHandler.getSettings(), dbHandler.getLeaderboard()]);
+    const showAt = new Date(settings.leaderboardShowTimestamp).getTime();
+    const isLocked = !settings.allowTestLeaderboard && Date.now() < showAt;
+    const { lang } = getPageContext(req);
+    renderPublic(req, res, 'leaderboard', { settings, isLocked, countdown: isLocked ? getCountdownParts(showAt) : null, categoryResults: leaderboard.categoryResults.map((category) => ({ ...category, categoryName: dbHandler.resolveLocalizedText(category.name, lang) })) });
+}));
 
-    const mappedCategories = categories.map((category) => ({
-        ...category,
-        displayName: dbHandler.resolveLocalizedText(category.name, langContext.lang),
-        candidates: candidates.filter((candidate) => candidate.categoryId === category.categoryId).sort((a, b) => (a.order || 0) - (b.order || 0))
-    }));
+router.post('/api/telegram-auth', asyncRoute(async (req, res) => {
+    const verification = verifyTelegramInitData(req.body && req.body.initData);
+    if (!verification.valid) return res.status(401).json({ success: false, error: verification.error });
+    const user = await dbHandler.getOrCreateTelegramUser(verification.user.id, verification.user.username || verification.user.first_name, verification.user.language_code);
+    res.json({ success: true, voted: Boolean(user.voted), user: { id: user.telegramId, username: user.username, languageCode: user.languageCode } });
+}));
 
-    if (!categoryIds.length) {
-        return res.render('vote', { ...langContext, categories: [], message: 'No categories have been configured yet.' });
-    }
+router.post('/api/telegram-vote', asyncRoute(async (req, res) => {
+    const verification = verifyTelegramInitData(req.body && req.body.initData);
+    if (!verification.valid) return res.status(401).json({ success: false, error: verification.error });
+    const result = await dbHandler.submitTelegramVote(verification.user.id, req.body && req.body.categoryVotes, verification.user);
+    res.status(result.success ? 200 : 400).json(result);
+}));
 
-    res.render('vote', { ...langContext, categories: mappedCategories });
+router.get('/admin/login', (req, res) => {
+    if (req.session && req.session.isAdmin) return res.redirect('/admin');
+    return res.render('admin-settings', { ...getPageContext(req), isLoggedIn: false, errorMessage: '' });
 });
-
-router.post('/api/telegram-auth', async (req, res) => {
-    try {
-        const initData = req.body && req.body.initData;
-        const verification = verifyTelegramInitData(initData);
-
-        if (!verification.valid) {
-            return res.status(401).json({ success: false, error: verification.error });
-        }
-
-        const user = await dbHandler.getOrCreateTelegramUser(
-            verification.user.id,
-            verification.user.username || verification.user.first_name || 'telegram_user',
-            verification.user.language_code || 'en'
-        );
-
-        return res.json({
-            success: true,
-            voted: !!user.voted,
-            user: {
-                id: user.telegramId,
-                username: user.username,
-                voted: !!user.voted,
-                languageCode: user.languageCode || 'en'
-            }
-        });
-    } catch (error) {
-        return res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-router.post('/api/telegram-vote', async (req, res) => {
-    try {
-        const { initData, categoryVotes } = req.body || {};
-        const verification = verifyTelegramInitData(initData);
-
-        if (!verification.valid) {
-            return res.status(401).json({ success: false, error: verification.error });
-        }
-
-        if (!categoryVotes || typeof categoryVotes !== 'object') {
-            return res.status(400).json({ success: false, error: 'Missing telegram vote payload.' });
-        }
-
-        const user = await dbHandler.getOrCreateTelegramUser(
-            verification.user.id,
-            verification.user.username || verification.user.first_name || 'telegram_user',
-            verification.user.language_code || 'en'
-        );
-
-        const result = await dbHandler.submitTelegramVote(user.telegramId, categoryVotes, verification.user);
-        if (!result.success) {
-            return res.status(400).json({ success: false, error: result.error });
-        }
-
-        return res.json({ success: true, voted: true, user: result.user });
-    } catch (error) {
-        return res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-router.get('/leaderboard', async (req, res) => {
-    const langContext = getPageContext(req);
-    const settings = await dbHandler.getSettings();
-    const leaderboard = await dbHandler.getLeaderboard();
-    const leaderBoardShowTimestamp = new Date(settings.leaderboardShowTimestamp).getTime();
-    const leaderboardOpen = settings.allowTestLeaderboard === true || Date.now() >= leaderBoardShowTimestamp;
-    const isLocked = !leaderboardOpen;
-
-    const countdown = isLocked ? getCountdownParts(leaderBoardShowTimestamp) : null;
-
-    res.render('leaderboard', {
-        ...langContext,
-        settings,
-        countdown,
-        isLocked,
-        leaderboardOpen,
-        categoryResults: leaderboard.categoryResults || []
-    });
-});
-
-router.get('/admin/login', async (req, res) => {
-    if (req.session && req.session.isAdmin) {
-        return res.redirect('/admin');
-    }
-
-    const langContext = getPageContext(req);
-    res.render('admin', { ...langContext, isLoggedIn: false, settings: await dbHandler.getSettings(), categories: await dbHandler.getCategories(), candidates: await dbHandler.getCandidates(), errorMessage: '' });
-});
-
-router.post('/admin/login', async (req, res) => {
-    const { password } = req.body || {};
-    const expectedPassword = process.env.ADMIN_PASSWORD || 'admin123';
-
-    if (!password || password !== expectedPassword) {
-        const langContext = getPageContext(req);
-        return res.status(401).render('admin', {
-            ...langContext,
-            isLoggedIn: false,
-            settings: await dbHandler.getSettings(),
-            categories: await dbHandler.getCategories(),
-            candidates: await dbHandler.getCandidates(),
-            errorMessage: 'Invalid password.'
-        });
-    }
-
+router.post('/admin/login', (req, res) => {
+    if (req.body.password !== (process.env.ADMIN_PASSWORD || 'admin123')) return res.status(401).render('admin-settings', { ...getPageContext(req), isLoggedIn: false, errorMessage: 'Invalid password.' });
     req.session.isAdmin = true;
+    return res.redirect('/admin');
+});
+router.post('/admin/logout', adminGuard, (req, res) => req.session.destroy(() => res.redirect('/admin/login')));
+
+router.get('/admin', adminGuard, asyncRoute(async (req, res) => res.render('admin-settings', { ...getPageContext(req), isLoggedIn: true, settings: await dbHandler.getSettings(), errorMessage: '' })));
+router.post('/admin/settings', adminGuard, asyncRoute(async (req, res) => {
+    await dbHandler.updateSettings({ votingStartTimestamp: req.body.votingStartTimestamp, leaderboardShowTimestamp: req.body.leaderboardShowTimestamp, showSoonText: req.body.showSoonText === 'on', allowTestVoting: req.body.allowTestVoting === 'on', allowTestLeaderboard: req.body.allowTestLeaderboard === 'on' });
     res.redirect('/admin');
-});
+}));
 
-router.post('/admin/logout', (req, res) => {
-    req.session.destroy(() => {
-        res.redirect('/admin/login');
-    });
-});
+router.get('/admin/categories', adminGuard, asyncRoute(async (req, res) => res.render('admin-categories', { ...getPageContext(req), categories: await dbHandler.getCategories() })));
+router.post('/admin/categories', adminGuard, uploadImage, asyncRoute(async (req, res) => {
+    await dbHandler.createCategory({ name: { en: req.body.nameEn || '', ru: req.body.nameRu || '', ro: req.body.nameRo || '' }, image: imagePath(req), order: req.body.order });
+    res.redirect('/admin/categories');
+}));
+router.post('/admin/categories/:categoryId/update', adminGuard, uploadImage, asyncRoute(async (req, res) => {
+    const payload = { name: { en: req.body.nameEn || '', ru: req.body.nameRu || '', ro: req.body.nameRo || '' }, order: req.body.order };
+    if (req.file) payload.image = imagePath(req);
+    await dbHandler.updateCategory(req.params.categoryId, payload);
+    res.redirect('/admin/categories');
+}));
+router.post('/admin/categories/:categoryId/delete', adminGuard, asyncRoute(async (req, res) => {
+    await dbHandler.deleteCategory(req.params.categoryId);
+    res.redirect('/admin/categories');
+}));
 
-router.get('/admin', adminGuard, async (req, res) => {
-    const langContext = getPageContext(req);
-    const [settings, categories, candidates] = await Promise.all([
-        dbHandler.getSettings(),
-        dbHandler.getCategories(),
-        dbHandler.getCandidates()
-    ]);
-
-    res.render('admin', {
-        ...langContext,
-        isLoggedIn: true,
-        settings,
-        categories,
-        candidates,
-        errorMessage: ''
-    });
-});
-
-router.post('/admin/settings', adminGuard, async (req, res) => {
-    try {
-        const payload = {
-            allowTestVoting: req.body.allowTestVoting === 'on',
-            allowTestLeaderboard: req.body.allowTestLeaderboard === 'on',
-            showSoonText: req.body.showSoonText === 'on',
-            votingStartTimestamp: req.body.votingStartTimestamp,
-            leaderboardShowTimestamp: req.body.leaderboardShowTimestamp
-        };
-
-        await dbHandler.updateSettings(payload);
-        res.redirect('/admin');
-    } catch (error) {
-        res.status(500).send(`Unable to update settings: ${error.message}`);
-    }
-});
-
-router.post('/admin/categories', adminGuard, applyUploadMiddleware, async (req, res) => {
-    const categoryImage = req.file || null;
-    const name = {
-        en: req.body.nameEn || '',
-        ru: req.body.nameRu || '',
-        ro: req.body.nameRo || ''
-    };
-
-    const result = await dbHandler.createCategory({
-        categoryId: req.body.categoryId || `cat_${Date.now()}`,
-        name,
-        image: categoryImage ? `/uploads/${categoryImage.filename}` : (req.body.imageUrl || ''),
-        order: Number(req.body.order || 0)
-    });
-
-    if (!result) {
-        return res.status(400).send('Unable to create category');
-    }
-
-    res.redirect('/admin');
-});
-
-router.post('/admin/categories/:id/update', adminGuard, applyUploadMiddleware, async (req, res) => {
-    const categoryId = req.params.id;
-    const categoryImage = req.file || null;
-    const name = {
-        en: req.body.nameEn || '',
-        ru: req.body.nameRu || '',
-        ro: req.body.nameRo || ''
-    };
-
-    await dbHandler.updateCategory(categoryId, {
-        name,
-        image: categoryImage ? `/uploads/${categoryImage.filename}` : (req.body.imageUrl || ''),
-        order: Number(req.body.order || 0)
-    });
-
-    res.redirect('/admin');
-});
-
-router.post('/admin/categories/:id/delete', adminGuard, async (req, res) => {
-    await dbHandler.deleteCategory(req.params.id);
-    res.redirect('/admin');
-});
-
-router.post('/admin/candidates', adminGuard, applyUploadMiddleware, async (req, res) => {
-    const candidateImage = req.file || null;
-    const payload = {
-        candidateId: req.body.candidateId || `candidate_${Date.now()}`,
-        categoryId: req.body.categoryId || '',
-        name: req.body.name || '',
-        description: req.body.description || '',
-        code: req.body.code || '',
-        order: Number(req.body.order || 0),
-        image: candidateImage ? `/uploads/${candidateImage.filename}` : (req.body.imageUrl || '')
-    };
-
-    await dbHandler.createCandidate(payload);
-    res.redirect('/admin');
-});
-
-router.post('/admin/candidates/:candidateId/:categoryId/update', adminGuard, applyUploadMiddleware, async (req, res) => {
-    const candidateId = req.params.candidateId;
-    const categoryId = req.params.categoryId;
-    const candidateImage = req.file || null;
-    await dbHandler.updateCandidate(candidateId, {
-        categoryId,
-        name: req.body.name || '',
-        description: req.body.description || '',
-        code: req.body.code || '',
-        image: candidateImage ? `/uploads/${candidateImage.filename}` : (req.body.imageUrl || ''),
-        order: Number(req.body.order || 0)
-    });
-    res.redirect('/admin');
-});
-
-router.post('/admin/candidates/:candidateId/:categoryId/delete', adminGuard, async (req, res) => {
+router.get('/admin/categories/:categoryId/candidates', adminGuard, asyncRoute(async (req, res) => {
+    const category = await dbHandler.getCategoryById(req.params.categoryId);
+    if (!category) return res.status(404).render('error', { message: 'Category not found.' });
+    return res.render('admin-candidates', { ...getPageContext(req), category, candidates: await dbHandler.getCandidatesByCategory(category.categoryId) });
+}));
+router.post('/admin/categories/:categoryId/candidates', adminGuard, uploadImage, asyncRoute(async (req, res) => {
+    await dbHandler.createCandidate({ categoryId: req.params.categoryId, name: req.body.name, description: req.body.description, code: req.body.code, order: req.body.order, image: imagePath(req) });
+    res.redirect(categoryPath(req.params.categoryId));
+}));
+router.post('/admin/categories/:categoryId/candidates/:candidateId/update', adminGuard, uploadImage, asyncRoute(async (req, res) => {
+    const payload = { categoryId: req.params.categoryId, name: req.body.name, description: req.body.description, code: req.body.code, order: req.body.order };
+    if (req.file) payload.image = imagePath(req);
+    await dbHandler.updateCandidate(req.params.candidateId, payload);
+    res.redirect(categoryPath(req.params.categoryId));
+}));
+router.post('/admin/categories/:categoryId/candidates/:candidateId/order', adminGuard, asyncRoute(async (req, res) => {
+    await dbHandler.updateCandidate(req.params.candidateId, { categoryId: req.params.categoryId, order: req.body.order });
+    res.redirect(categoryPath(req.params.categoryId));
+}));
+router.post('/admin/categories/:categoryId/candidates/:candidateId/delete', adminGuard, asyncRoute(async (req, res) => {
     await dbHandler.deleteCandidate(req.params.candidateId, req.params.categoryId);
-    res.redirect('/admin');
-});
+    res.redirect(categoryPath(req.params.categoryId));
+}));
 
 module.exports = router;

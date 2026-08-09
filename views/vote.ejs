@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>Vote</title>
+  <title><%= t.voteNow %></title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
@@ -26,10 +26,17 @@
     <header class="mb-5 rounded-3xl border border-slate-700 bg-slate-900/80 p-4 shadow-2xl shadow-sky-900/20">
       <div class="flex items-center justify-between gap-3">
         <div>
-          <p class="text-[10px] font-semibold uppercase tracking-[0.22em] text-sky-400">Vote</p>
-          <h1 class="mt-1 text-2xl font-bold text-white">GoCon Voting</h1>
+          <p class="text-[10px] font-semibold uppercase tracking-[0.22em] text-sky-400">GoCon</p>
+          <h1 class="mt-1 text-2xl font-bold text-white"><%= t.voteNow %></h1>
         </div>
-        <a href="/" class="rounded-full border border-slate-600 px-3 py-1 text-xs font-medium text-slate-200">Home</a>
+        <div class="flex items-center gap-2">
+          <select id="languageSwitcher" aria-label="Language" class="rounded-full border border-slate-600 bg-slate-800 px-2 py-1 text-xs font-medium text-slate-200 outline-none">
+            <option value="en" <%= lang === 'en' ? 'selected' : '' %>>EN</option>
+            <option value="ru" <%= lang === 'ru' ? 'selected' : '' %>>RU</option>
+            <option value="ro" <%= lang === 'ro' ? 'selected' : '' %>>RO</option>
+          </select>
+          <a href="/?lang=<%= lang %>" class="rounded-full border border-slate-600 px-3 py-1 text-xs font-medium text-slate-200"><%= t.home %></a>
+        </div>
       </div>
     </header>
 
@@ -64,7 +71,7 @@
                       <span class="rounded-full border border-sky-500/40 bg-sky-500/10 px-2 py-1 text-[10px] font-semibold uppercase text-sky-200"><%= candidate.code %></span>
                     <% } %>
                   </div>
-                  <p class="mt-1 text-xs text-slate-300"><%= candidate.description || 'No description provided yet.' %></p>
+                  <p class="mt-1 text-xs text-slate-300"><%= candidate.description || t.noDescription %></p>
                 </div>
               </label>
             <% }) %>
@@ -72,13 +79,20 @@
         </section>
       <% }) %>
 
-      <button id="submitVoteButton" type="submit" class="w-full rounded-2xl bg-emerald-500 px-4 py-3 text-base font-bold text-slate-950 shadow-lg shadow-emerald-500/20">Submit vote</button>
+      <button id="submitVoteButton" type="submit" class="w-full rounded-2xl bg-emerald-500 px-4 py-3 text-base font-bold text-slate-950 shadow-lg shadow-emerald-500/20"><%= t.submitVote %></button>
     </form>
   </div>
 
   <script>
     const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
     const voteForm = document.getElementById('voteForm');
+    const currentLanguage = '<%= lang %>';
+
+    document.getElementById('languageSwitcher').addEventListener('change', (event) => {
+      localStorage.setItem('votingLang', event.target.value);
+      window.location.href = `/vote?lang=${encodeURIComponent(event.target.value)}`;
+    });
+    if (!localStorage.getItem('votingLang')) localStorage.setItem('votingLang', currentLanguage);
 
     const syncSelectionStyles = () => {
       document.querySelectorAll('.candidate-card').forEach((card) => {
@@ -106,12 +120,12 @@
       });
 
       if (missingSelection) {
-        window.alert('Please select one option in each category before submitting.');
+        window.alert('<%= t.selectOptionEach %>');
         return;
       }
 
       if (!tg || !tg.initData) {
-        window.alert('This page must be opened inside Telegram.');
+        window.alert('<%= t.telegramOnly %>');
         return;
       }
 
@@ -122,18 +136,18 @@
       }).then((response) => response.json());
 
       if (!result.success) {
-        window.alert(result.error || 'Vote submission failed.');
+        window.alert(result.error || '<%= t.voteFailed %>');
         return;
       }
 
-      window.location.href = '/leaderboard';
+      window.location.href = `/leaderboard?lang=${encodeURIComponent(localStorage.getItem('votingLang') || currentLanguage)}`;
     });
 
     if (tg) {
       tg.ready();
       tg.expand();
       if (tg.MainButton) {
-        tg.MainButton.setText('SUBMIT VOTE');
+        tg.MainButton.setText('<%= t.submitVote %>');
         tg.MainButton.onClick(() => voteForm.requestSubmit());
       }
     }

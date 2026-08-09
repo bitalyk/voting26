@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GoCon Administration</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>body { background: #0b1220; color: #e2e8f0; }</style>
+</head>
+<body class="min-h-screen antialiased">
+  <main class="mx-auto max-w-3xl px-4 py-8">
+    <% if (!isLoggedIn) { %>
+      <section class="mx-auto max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-sky-400">GoCon</p>
+        <h1 class="mt-2 text-3xl font-bold text-white">Admin login</h1>
+        <% if (errorMessage) { %><p class="mt-4 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-200"><%= errorMessage %></p><% } %>
+        <form method="POST" action="/admin/login" class="mt-6 space-y-4">
+          <label class="block text-sm font-medium">Password<input name="password" type="password" required class="mt-2 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white outline-none focus:border-sky-400" /></label>
+          <button class="w-full rounded-lg bg-sky-400 px-4 py-2.5 font-bold text-slate-950">Sign in</button>
+        </form>
+      </section>
+    <% } else { %>
+      <header class="mb-6 flex items-center justify-between gap-4">
+        <div><p class="text-xs font-semibold uppercase tracking-[0.2em] text-sky-400">GoCon</p><h1 class="mt-1 text-3xl font-bold text-white">Global settings</h1></div>
+        <form method="POST" action="/admin/logout"><button class="rounded-lg border border-slate-600 px-3 py-2 text-sm font-semibold">Logout</button></form>
+      </header>
+      <section class="rounded-xl border border-slate-700 bg-slate-900 p-5 shadow-xl">
+        <form method="POST" action="/admin/settings" class="space-y-5">
+          <div class="grid gap-4 md:grid-cols-2">
+            <label class="text-sm font-medium">Voting start<input type="datetime-local" name="votingStartTimestamp" value="<%= settings.votingStartTimestamp ? new Date(settings.votingStartTimestamp).toISOString().slice(0, 16) : '' %>" class="mt-2 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white" /></label>
+            <label class="text-sm font-medium">Leaderboard visible<input type="datetime-local" name="leaderboardShowTimestamp" value="<%= settings.leaderboardShowTimestamp ? new Date(settings.leaderboardShowTimestamp).toISOString().slice(0, 16) : '' %>" class="mt-2 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white" /></label>
+          </div>
+          <div class="grid gap-3 md:grid-cols-3">
+            <label class="flex items-center justify-between rounded-lg border border-slate-700 bg-slate-800 px-3 py-3 text-sm">Show Soon<input type="checkbox" name="showSoonText" <%= settings.showSoonText ? 'checked' : '' %> class="h-4 w-4 accent-sky-400" /></label>
+            <label class="flex items-center justify-between rounded-lg border border-slate-700 bg-slate-800 px-3 py-3 text-sm">Allow Test Voting<input type="checkbox" name="allowTestVoting" <%= settings.allowTestVoting ? 'checked' : '' %> class="h-4 w-4 accent-sky-400" /></label>
+            <label class="flex items-center justify-between rounded-lg border border-slate-700 bg-slate-800 px-3 py-3 text-sm">Allow Test Leaderboard<input type="checkbox" name="allowTestLeaderboard" <%= settings.allowTestLeaderboard ? 'checked' : '' %> class="h-4 w-4 accent-sky-400" /></label>
+          </div>
+          <button class="rounded-lg bg-emerald-400 px-4 py-2.5 font-bold text-slate-950">Save settings</button>
+        </form>
+      </section>
+      <a href="/admin/categories" class="mt-6 block rounded-xl bg-sky-400 px-5 py-4 text-center text-lg font-bold text-slate-950">Manage Categories</a>
+    <% } %>
+  </main>
+</body>
+</html>

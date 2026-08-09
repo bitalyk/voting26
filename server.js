@@ -1,7 +1,6 @@
 require('dotenv').config();
 
 const fs = require('fs');
-const net = require('net');
 const path = require('path');
 const express = require('express');
 const mongoose = require('mongoose');
@@ -13,28 +12,6 @@ const dbHandler = require('./dbHandler');
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/voting_system';
-
-function isPortFree(port) {
-    return new Promise((resolve) => {
-        const tester = net.createServer();
-        tester.once('error', () => resolve(false));
-        tester.once('listening', () => {
-            tester.once('close', () => resolve(true));
-            tester.close();
-        });
-        tester.listen(port, '127.0.0.1');
-    });
-}
-
-async function getAvailablePort(preferredPort) {
-    const candidates = Array.from(new Set([preferredPort, 3000, 3001, 3002, 4000, 5050, 8080]));
-    for (const port of candidates) {
-        if (await isPortFree(port)) {
-            return port;
-        }
-    }
-    return preferredPort;
-}
 
 const uploadDirectory = path.join(__dirname, 'public', 'uploads');
 fs.mkdirSync(uploadDirectory, { recursive: true });
@@ -62,7 +39,7 @@ const upload = multer({
 app.locals.upload = upload;
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
-app.set('trust proxy', true);
+app.set('trust proxy', 1);
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(uploadDirectory));
@@ -75,11 +52,19 @@ app.use(session({
     cookie: {
         maxAge: 1000 * 60 * 60 * 6,
         httpOnly: true,
-        sameSite: 'lax'
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production'
     }
 }));
 
 app.use('/', routes);
+
+app.use((error, req, res, next) => {
+    if (error instanceof multer.MulterError || error.message === 'Only image uploads are allowed.') {
+        return res.status(400).render('error', { message: error.message });
+    }
+    return next(error);
+});
 
 app.use((req, res) => {
     res.status(404).render('error', { message: 'The requested page could not be found.' });
@@ -89,9 +74,16 @@ mongoose.connect(MONGO_URI)
     .then(async () => {
         console.log('Connected to MongoDB successfully');
         await dbHandler.seedDatabaseDefaults();
-        const activePort = await getAvailablePort(PORT);
-        app.listen(activePort, () => {
-            console.log(`Server is running at http://localhost:${activePort}`);
+        const server = app.listen(PORT, () => {
+            console.log(`Server is running at http://localhost:${PORT}`);
+        });
+        server.on('error', (error) => {
+            if (error.code === 'EADDRINUSE') {
+                console.error(`Port ${PORT} is already in use. Stop the existing server or set PORT to an available port.`);
+            } else {
+                console.error('HTTP server error:', error);
+            }
+            process.exit(1);
         });
     })
     .catch((error) => {

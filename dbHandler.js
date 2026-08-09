@@ -15,21 +15,19 @@ const categorySchema = new Schema({
     categoryId: { type: String, required: true, unique: true, index: true },
     name: { type: Schema.Types.Mixed, default: {} },
     image: { type: String, default: '' },
-    order: { type: Number, default: 0 }
+    order: { type: Number, default: () => Date.now() }
 }, { timestamps: true });
 
 const candidateSchema = new Schema({
-    candidateId: { type: String, required: true, index: true },
+    candidateId: { type: String, required: true, unique: true, index: true },
     categoryId: { type: String, required: true, index: true },
     name: { type: String, required: true },
     description: { type: String, default: '' },
     code: { type: String, default: '' },
     image: { type: String, default: '' },
-    order: { type: Number, default: 0 },
+    order: { type: Number, default: () => Date.now() },
     votes: { type: Number, default: 0 }
 }, { timestamps: true });
-
-candidateSchema.index({ candidateId: 1, categoryId: 1 }, { unique: true, name: 'candidate_id_category_unique' });
 
 const telegramUserSchema = new Schema({
     telegramId: { type: String, required: true, unique: true, index: true },
@@ -43,6 +41,18 @@ const Settings = mongoose.model('Settings', settingsSchema);
 const Category = mongoose.model('Category', categorySchema);
 const Candidate = mongoose.model('Candidate', candidateSchema);
 const TelegramUser = mongoose.model('TelegramUser', telegramUserSchema);
+
+async function generateUniqueFiveDigitId(Model, fieldName) {
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+        const value = String(crypto.randomInt(10000, 100000));
+        const exists = await Model.exists({ [fieldName]: value });
+        if (!exists) {
+            return value;
+        }
+    }
+
+    throw new Error(`Unable to generate a unique ${fieldName}.`);
+}
 
 function toDateValue(value) {
     if (!value && value !== 0) {
@@ -109,53 +119,6 @@ function resolveLocalizedText(value, fallback = 'en') {
     return String(value);
 }
 
-const defaultCategories = [
-    {
-        categoryId: 'cat_1',
-        name: { en: 'Best Innovation', ru: 'Лучшее инновационное решение', ro: 'Cea mai bună inovație' },
-        image: '',
-        order: 1
-    },
-    {
-        categoryId: 'cat_2',
-        name: { en: 'Best Design', ru: 'Лучший дизайн', ro: 'Cel mai bun design' },
-        image: '',
-        order: 2
-    },
-    {
-        categoryId: 'cat_3',
-        name: { en: 'People\'s Choice', ru: 'Выбор людей', ro: 'Alegerea publicului' },
-        image: '',
-        order: 3
-    }
-];
-
-const defaultCandidates = [
-    { candidateId: 'cand_1', categoryId: 'cat_1', name: 'Project Alpha', description: 'Strong product vision and impact.', code: 'A1', image: '', order: 1, votes: 0 },
-    { candidateId: 'cand_2', categoryId: 'cat_1', name: 'Project Beta', description: 'Efficient and scalable execution.', code: 'B1', image: '', order: 2, votes: 0 },
-    { candidateId: 'cand_3', categoryId: 'cat_1', name: 'Project Gamma', description: 'High-value innovation with measurable growth.', code: 'G1', image: '', order: 3, votes: 0 },
-    { candidateId: 'cand_4', categoryId: 'cat_2', name: 'Design Studio A', description: 'Elegant interface and smooth UX.', code: 'D1', image: '', order: 1, votes: 0 },
-    { candidateId: 'cand_5', categoryId: 'cat_2', name: 'Design Studio B', description: 'Creative brand system and polish.', code: 'D2', image: '', order: 2, votes: 0 },
-    { candidateId: 'cand_6', categoryId: 'cat_2', name: 'Design Studio C', description: 'Modern visuals with strong clarity.', code: 'D3', image: '', order: 3, votes: 0 },
-    { candidateId: 'cand_7', categoryId: 'cat_3', name: 'Team Nova', description: 'Strong community support and momentum.', code: 'N1', image: '', order: 1, votes: 0 },
-    { candidateId: 'cand_8', categoryId: 'cat_3', name: 'Team Apex', description: 'Voted for clarity, charm, and execution.', code: 'A2', image: '', order: 2, votes: 0 },
-    { candidateId: 'cand_9', categoryId: 'cat_3', name: 'Team Vortex', description: 'High energy and audience engagement.', code: 'V1', image: '', order: 3, votes: 0 }
-];
-
-async function ensureCandidateIdentityIndex() {
-    try {
-        await Candidate.collection.dropIndex('candidateId_1');
-    } catch (error) {
-        // The legacy global unique index may not exist. Ignore this.
-    }
-
-    try {
-        await Candidate.collection.createIndex({ candidateId: 1, categoryId: 1 }, { unique: true, name: 'candidate_id_category_unique' });
-    } catch (error) {
-        // The compound index may already exist or the collection may be empty.
-    }
-}
-
 async function seedDatabaseDefaults() {
     const settingsCount = await Settings.countDocuments();
     if (settingsCount === 0) {
@@ -168,17 +131,6 @@ async function seedDatabaseDefaults() {
         });
     }
 
-    const categoryCount = await Category.countDocuments();
-    if (categoryCount === 0) {
-        await Category.insertMany(defaultCategories);
-    }
-
-    await ensureCandidateIdentityIndex();
-
-    const candidateCount = await Candidate.countDocuments();
-    if (candidateCount === 0) {
-        await Candidate.insertMany(defaultCandidates);
-    }
 }
 
 module.exports = {
@@ -241,12 +193,12 @@ module.exports = {
         return Category.findOne({ categoryId }).lean();
     },
 
-    createCategory: async function createCategory({ categoryId, name, image, order }) {
+    createCategory: async function createCategory({ name, image, order }) {
         const doc = await Category.create({
-            categoryId: categoryId || `cat_${Date.now()}`,
+            categoryId: await generateUniqueFiveDigitId(Category, 'categoryId'),
             name: name || {},
             image: image || '',
-            order: Number(order || 0)
+            order: order === undefined || order === '' ? Date.now() : Number(order)
         });
         return doc.toObject();
     },
@@ -289,17 +241,21 @@ module.exports = {
         return candidates;
     },
 
+    getCandidatesByCategory: async function getCandidatesByCategory(categoryId) {
+        return Candidate.find({ categoryId }).sort({ order: 1, createdAt: 1 }).lean();
+    },
+
     getCandidateById: async function getCandidateById(candidateId) {
         return Candidate.findOne({ candidateId }).lean();
     },
 
     createCandidate: async function createCandidate(payload = {}) {
-        const candidateId = payload.candidateId || `candidate_${Date.now()}`;
+        const candidateId = await generateUniqueFiveDigitId(Candidate, 'candidateId');
         const categoryId = payload.categoryId || '';
 
-        const duplicate = await Candidate.findOne({ candidateId, categoryId });
-        if (duplicate) {
-            throw new Error(`Candidate ID "${candidateId}" already exists in category "${categoryId}".`);
+        const category = await Category.exists({ categoryId });
+        if (!category) {
+            throw new Error('The selected category does not exist.');
         }
 
         const candidate = await Candidate.create({
@@ -309,7 +265,7 @@ module.exports = {
             description: payload.description || '',
             code: payload.code || '',
             image: payload.image || '',
-            order: Number(payload.order || 0),
+            order: payload.order === undefined || payload.order === '' ? Date.now() : Number(payload.order),
             votes: 0
         });
         return candidate.toObject();
@@ -336,16 +292,12 @@ module.exports = {
             return null;
         }
 
-        const nextCategoryId = payload.categoryId || candidate.categoryId;
-        if (payload.categoryId && nextCategoryId !== candidate.categoryId) {
-            const duplicate = await Candidate.findOne({ candidateId, categoryId: nextCategoryId });
-            if (duplicate && duplicate._id.toString() !== candidate._id.toString()) {
-                throw new Error(`Candidate ID "${candidateId}" already exists in category "${nextCategoryId}".`);
-            }
-        }
-
         if (payload.categoryId) {
-            candidate.categoryId = nextCategoryId;
+            const category = await Category.exists({ categoryId: payload.categoryId });
+            if (!category) {
+                throw new Error('The selected category does not exist.');
+            }
+            candidate.categoryId = payload.categoryId;
         }
 
         if (payload.name) {
@@ -470,10 +422,6 @@ module.exports = {
             });
         }
 
-        if (user.voted) {
-            return { success: false, error: 'This Telegram account has already voted.' };
-        }
-
         const votingStatus = await module.exports.isVotingOpen();
         if (!votingStatus.allowed) {
             return { success: false, error: 'Voting is not open yet.' };
@@ -508,20 +456,35 @@ module.exports = {
             return { success: false, error: 'One or more selected candidates are invalid.' };
         }
 
-        for (const { categoryId, candidateId } of selectedPairs) {
-            await Candidate.updateOne(
-                { categoryId, candidateId },
-                { $inc: { votes: 1 } }
-            );
+        const votedAt = new Date();
+        const claimedUser = await TelegramUser.findOneAndUpdate(
+            { telegramId: normalizedId, voted: false },
+            { $set: { voted: true, votedAt } },
+            { new: true }
+        );
+
+        if (!claimedUser) {
+            return { success: false, error: 'This Telegram account has already voted.' };
         }
 
-        user.voted = true;
-        user.votedAt = new Date();
-        await user.save();
+        try {
+            await Candidate.bulkWrite(selectedPairs.map(({ categoryId, candidateId }) => ({
+                updateOne: {
+                    filter: { categoryId, candidateId },
+                    update: { $inc: { votes: 1 } }
+                }
+            })));
+        } catch (error) {
+            await TelegramUser.updateOne(
+                { _id: claimedUser._id, votedAt },
+                { $set: { voted: false }, $unset: { votedAt: 1 } }
+            );
+            throw error;
+        }
 
         return {
             success: true,
-            user: { telegramId: user.telegramId, voted: user.voted, votedAt: user.votedAt }
+            user: { telegramId: claimedUser.telegramId, voted: claimedUser.voted, votedAt: claimedUser.votedAt }
         };
     },
 
