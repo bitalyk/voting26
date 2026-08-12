@@ -55,11 +55,44 @@ const telegramUserSchema = new Schema({
 
 telegramUserSchema.index({ username: 1 });
 
+const mapLegendSchema = new Schema({
+    eventTypeId: { type: String, required: true },
+    customName: { type: Schema.Types.Mixed, default: {} },
+    symbolIcon: { type: String, default: '' },
+    order: { type: Number, default: 0 }
+}, { _id: false });
+
+const placedEventSchema = new Schema({
+    instanceId: { type: String, required: true },
+    eventTypeId: { type: String, required: true },
+    xPercent: { type: Number, required: true, min: 0, max: 100 },
+    yPercent: { type: Number, required: true, min: 0, max: 100 }
+}, { _id: false });
+
+const mapSchema = new Schema({
+    mapId: { type: String, required: true, unique: true, index: true },
+    name: { type: Schema.Types.Mixed, default: {} },
+    imageUrl: { type: String, default: '' },
+    isDefault: { type: Boolean, default: false },
+    legend: { type: [mapLegendSchema], default: [] },
+    placedEvents: { type: [placedEventSchema], default: [] },
+    createdAt: { type: Date, default: Date.now }
+}, { timestamps: true });
+
+const mapEventTypeSchema = new Schema({
+    eventTypeId: { type: String, required: true, unique: true, index: true },
+    name: { type: Schema.Types.Mixed, default: {} },
+    description: { type: Schema.Types.Mixed, default: {} },
+    symbolIcon: { type: String, default: '' }
+}, { timestamps: true });
+
 const Settings = mongoose.model('Settings', settingsSchema);
 const Category = mongoose.model('Category', categorySchema);
 const Candidate = mongoose.model('Candidate', candidateSchema);
 const Prize = mongoose.model('Prize', prizeSchema);
 const TelegramUser = mongoose.model('TelegramUser', telegramUserSchema);
+const Map = mongoose.model('Map', mapSchema);
+const MapEventType = mongoose.model('MapEventType', mapEventTypeSchema);
 
 async function generateUniqueFiveDigitId(Model, fieldName) {
     for (let attempt = 0; attempt < 20; attempt += 1) {
@@ -177,6 +210,47 @@ function normalizePrizeColor(value) {
     return color;
 }
 
+function normalizeLocalizedValue(value, label, required = false) {
+    if (typeof value === 'string') {
+        const text = value.trim();
+        if (required && !text) throw new Error(`${label} is required.`);
+        return { en: text, ru: text, ro: text };
+    }
+
+    const localized = {
+        en: String(value && value.en || '').trim(),
+        ru: String(value && value.ru || '').trim(),
+        ro: String(value && value.ro || '').trim()
+    };
+    if (required && !localized.en && !localized.ru && !localized.ro) throw new Error(`${label} is required.`);
+    return localized;
+}
+
+function normalizePercent(value, label) {
+    const percent = Number(value);
+    if (!Number.isFinite(percent) || percent < 0 || percent > 100) throw new Error(`${label} must be between 0 and 100.`);
+    return Math.round(percent * 1000) / 1000;
+}
+
+function normalizeMapEditorPayload(payload = {}) {
+    const instances = new Set();
+    const placedEvents = Array.isArray(payload.placedEvents) ? payload.placedEvents.map((event) => {
+        const instanceId = String(event && event.instanceId || '').trim();
+        const eventTypeId = String(event && event.eventTypeId || '').trim();
+        if (!instanceId || !eventTypeId || instances.has(instanceId)) throw new Error('Each placed event must have a unique instance and event type.');
+        instances.add(instanceId);
+        return { instanceId, eventTypeId, xPercent: normalizePercent(event.xPercent, 'Event X coordinate'), yPercent: normalizePercent(event.yPercent, 'Event Y coordinate') };
+    }) : [];
+    const legends = new Set();
+    const legend = Array.isArray(payload.legend) ? payload.legend.map((item, index) => {
+        const eventTypeId = String(item && item.eventTypeId || '').trim();
+        if (!eventTypeId || legends.has(eventTypeId)) throw new Error('Legend entries must reference unique event types.');
+        legends.add(eventTypeId);
+        return { eventTypeId, customName: normalizeLocalizedValue(item.customName, 'Legend name'), symbolIcon: String(item.symbolIcon || '').trim(), order: Number.isFinite(Number(item.order)) ? Number(item.order) : index };
+    }) : [];
+    return { placedEvents, legend };
+}
+
 async function seedDatabaseDefaults() {
     const settingsCount = await Settings.countDocuments();
     if (settingsCount === 0) {
@@ -241,6 +315,94 @@ module.exports = {
 
         await settings.save();
         return settings.toObject();
+    },
+
+    getMaps: async function getMaps() {
+        return Map.find({}).sort({ isDefault: -1, createdAt: 1 }).lean();
+    },
+
+    getMapById: async function getMapById(mapId) {
+        const normalizedMapId = String(mapId || '').trim();
+        if (!/^\d{5}$/.test(normalizedMapId)) return null;
+        return Map.findOne({ mapId: normalizedMapId }).lean();
+    },
+
+    createMap: async function createMap(payload = {}) {
+        const map = await Map.create({
+            mapId: await generateUniqueFiveDigitId(Map, 'mapId'),
+            name: normalizeLocalizedValue(payload.name, 'Map name'),
+            imageUrl: String(payload.imageUrl || '').trim(),
+            isDefault: Boolean(payload.isDefault),
+            legend: [],
+            
+            placedEvents: []
+        });
+        if (map.isDefault) await Map.updateMany({ _id: { $ne: map._id } }, { $set: { isDefault: false } });
+        return map.toObject();
+    },
+
+    updateMap: async function updateMap(mapId, payload = {}) {
+        const normalizedMapId = String(mapId || '').trim();
+        if (!/^\d{5}$/.test(normalizedMapId)) return null;
+        const map = await Map.findOne({ mapId: normalizedMapId });
+        if (!map) return null;
+        if (payload.name !== undefined) map.name = normalizeLocalizedValue(payload.name, 'Map name');
+        if (payload.imageUrl !== undefined) map.imageUrl = String(payload.imageUrl || '').trim();
+        if (payload.isDefault !== undefined) map.isDefault = Boolean(payload.isDefault);
+        if (payload.legend !== undefined || payload.placedEvents !== undefined) {
+            const editor = normalizeMapEditorPayload({ legend: payload.legend === undefined ? map.legend : payload.legend, placedEvents: payload.placedEvents === undefined ? map.placedEvents : payload.placedEvents });
+            const typeIds = [...new Set([...editor.legend.map((item) => item.eventTypeId), ...editor.placedEvents.map((item) => item.eventTypeId)])];
+            const validTypes = await MapEventType.countDocuments({ eventTypeId: { $in: typeIds } });
+            if (validTypes !== typeIds.length) throw new Error('One or more selected event types no longer exist.');
+            map.legend = editor.legend;
+            map.placedEvents = editor.placedEvents;
+        }
+        await map.save();
+        if (map.isDefault) await Map.updateMany({ _id: { $ne: map._id } }, { $set: { isDefault: false } });
+        return map.toObject();
+    },
+
+    deleteMap: async function deleteMap(mapId) {
+        const normalizedMapId = String(mapId || '').trim();
+        if (!/^\d{5}$/.test(normalizedMapId)) return false;
+        const result = await Map.deleteOne({ mapId: normalizedMapId });
+        return result.deletedCount === 1;
+    },
+
+    getMapEventTypes: async function getMapEventTypes() {
+        return MapEventType.find({}).sort({ createdAt: 1 }).lean();
+    },
+
+    createMapEventType: async function createMapEventType(payload = {}) {
+        const eventType = await MapEventType.create({
+            eventTypeId: await generateUniqueFiveDigitId(MapEventType, 'eventTypeId'),
+            name: normalizeLocalizedValue(payload.name, 'Event type name', true),
+            description: normalizeLocalizedValue(payload.description, 'Event type description'),
+            symbolIcon: String(payload.symbolIcon || '').trim()
+        });
+        return eventType.toObject();
+    },
+
+    updateMapEventType: async function updateMapEventType(eventTypeId, payload = {}) {
+        const normalizedEventTypeId = String(eventTypeId || '').trim();
+        if (!/^\d{5}$/.test(normalizedEventTypeId)) return null;
+        const eventType = await MapEventType.findOne({ eventTypeId: normalizedEventTypeId });
+        if (!eventType) return null;
+        if (payload.name !== undefined) eventType.name = normalizeLocalizedValue(payload.name, 'Event type name', true);
+        if (payload.description !== undefined) eventType.description = normalizeLocalizedValue(payload.description, 'Event type description');
+        if (payload.symbolIcon !== undefined) eventType.symbolIcon = String(payload.symbolIcon || '').trim();
+        await eventType.save();
+        if (payload.symbolIcon !== undefined) await Map.updateMany({ 'legend.eventTypeId': eventType.eventTypeId }, { $set: { 'legend.$[entry].symbolIcon': eventType.symbolIcon } }, { arrayFilters: [{ 'entry.eventTypeId': eventType.eventTypeId }] });
+        return eventType.toObject();
+    },
+
+    deleteMapEventType: async function deleteMapEventType(eventTypeId) {
+        const normalizedEventTypeId = String(eventTypeId || '').trim();
+        if (!/^\d{5}$/.test(normalizedEventTypeId)) return false;
+        const result = await MapEventType.deleteOne({ eventTypeId: normalizedEventTypeId });
+        if (result.deletedCount !== 1) return false;
+        await Map.updateMany({}, { $pull: { placedEvents: { eventTypeId: normalizedEventTypeId }, legend: { eventTypeId: normalizedEventTypeId } } });
+        return true;
     },
 
     getCategories: async function getCategories() {
