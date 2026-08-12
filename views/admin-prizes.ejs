@@ -11,7 +11,7 @@
   <main class="mx-auto max-w-4xl px-4 py-8">
     <header class="mb-6 flex items-center justify-between gap-4">
       <div><a href="/admin" class="text-sm text-sky-400">Settings</a><h1 class="mt-1 text-3xl font-bold text-white">Prizes</h1></div>
-      <button id="openCreateModal" type="button" class="rounded-lg bg-amber-400 px-4 py-2.5 font-bold text-slate-950">Add Prize</button>
+      <div class="flex gap-2"><button id="openPermissionsModal" type="button" class="rounded-lg border border-emerald-400 px-4 py-2.5 font-bold text-emerald-200">Manage Prize Permissions</button><button id="openCreateModal" type="button" class="rounded-lg bg-amber-400 px-4 py-2.5 font-bold text-slate-950">Add Prize</button></div>
     </header>
 
     <section class="space-y-3">
@@ -60,10 +60,35 @@
     </form>
   </div>
 
+  <div id="permissionsModal" class="fixed inset-0 hidden items-center justify-center bg-slate-950/75 p-4">
+    <section class="w-full max-w-lg rounded-xl border border-slate-700 bg-slate-900 p-5 shadow-2xl">
+      <div class="flex items-center justify-between"><h2 class="text-xl font-bold text-white">Prize permissions</h2><button type="button" data-close-modal="permissionsModal" class="text-slate-300">Close</button></div>
+      <p id="userCount" class="mt-4 text-sm text-slate-300">Total Registered Users: ...</p>
+      <input id="userSearch" type="search" autocomplete="off" placeholder="Search by @username..." class="mt-4 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white" />
+      <div id="userResults" class="mt-4 space-y-2"></div>
+    </section>
+  </div>
+
   <script>
     const showModal = (id) => document.getElementById(id).classList.replace('hidden', 'flex');
     const hideModal = (id) => document.getElementById(id).classList.replace('flex', 'hidden');
+    const adminToken = () => sessionStorage.getItem('adminBearerToken');
+    const adminFetch = (url, options = {}) => fetch(url, { ...options, headers: { ...(options.headers || {}), Authorization: `Bearer ${adminToken()}` } });
+    const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
+    const submitAdminForm = async (form) => {
+      const response = await adminFetch(form.action, { method: form.method || 'POST', body: new FormData(form) });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || 'Request failed.');
+      window.location.href = result.redirect || '/admin/prizes';
+    };
     document.getElementById('openCreateModal').onclick = () => showModal('createModal');
+    document.getElementById('openPermissionsModal').onclick = async () => {
+      if (!adminToken()) { window.location.href = '/admin/login'; return; }
+      showModal('permissionsModal');
+      const response = await adminFetch('/api/admin/users/count');
+      const result = await response.json();
+      document.getElementById('userCount').textContent = `Total Registered Users: ${result.count || 0}`;
+    };
     document.querySelectorAll('[data-close-modal]').forEach((button) => button.onclick = () => hideModal(button.dataset.closeModal));
     document.querySelectorAll('.edit-prize').forEach((button) => button.onclick = () => {
       document.getElementById('editPrizeForm').action = `/admin/prizes/${encodeURIComponent(button.dataset.id)}/update`;
@@ -74,6 +99,30 @@
       document.getElementById('editAmount').value = button.dataset.amount;
       document.getElementById('editColor').value = button.dataset.color;
       showModal('editModal');
+    });
+    document.querySelectorAll('form').forEach((form) => form.addEventListener('submit', (event) => { event.preventDefault(); submitAdminForm(form).catch((error) => window.alert(error.message)); }));
+    let searchTimer;
+    document.getElementById('userSearch').addEventListener('input', (event) => {
+      window.clearTimeout(searchTimer);
+      const query = event.target.value.trim();
+      const results = document.getElementById('userResults');
+      if (!query) { results.innerHTML = ''; return; }
+      searchTimer = window.setTimeout(async () => {
+        const response = await adminFetch(`/api/admin/users/search?q=${encodeURIComponent(query)}`);
+        const result = await response.json();
+        results.innerHTML = (result.users || []).map((user) => `<article class="flex items-center justify-between gap-3 rounded-lg border border-slate-700 bg-slate-800 p-3"><div><p class="font-semibold text-white">${user.username ? `@${escapeHtml(user.username)}` : 'Telegram user'}</p><p class="text-xs text-slate-400">${escapeHtml(user.telegramId)}</p></div><button data-user-id="${escapeHtml(user.telegramId)}" data-allowed="${user.allowedPrizes}" class="permission-toggle rounded-lg px-3 py-2 text-sm font-bold ${user.allowedPrizes ? 'bg-emerald-400 text-slate-950' : 'border border-slate-500 text-slate-100'}">${user.allowedPrizes ? 'Revoke Access' : 'Grant Access'}</button></article>`).join('') || '<p class="text-sm text-slate-400">No users found.</p>';
+      }, 250);
+    });
+    document.getElementById('userResults').addEventListener('click', async (event) => {
+      const button = event.target.closest('.permission-toggle');
+      if (!button) return;
+      button.disabled = true;
+      const response = await adminFetch(`/api/admin/users/${encodeURIComponent(button.dataset.userId)}/prize-permission`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ allowedPrizes: button.dataset.allowed !== 'true' }) });
+      const result = await response.json();
+      if (!response.ok || !result.success) { window.alert(result.error || 'Request failed.'); button.disabled = false; return; }
+      button.dataset.allowed = String(result.user.allowedPrizes);
+      button.textContent = result.user.allowedPrizes ? 'Revoke Access' : 'Grant Access';
+      button.className = `permission-toggle rounded-lg px-3 py-2 text-sm font-bold ${result.user.allowedPrizes ? 'bg-emerald-400 text-slate-950' : 'border border-slate-500 text-slate-100'}`;
     });
   </script>
 </body>

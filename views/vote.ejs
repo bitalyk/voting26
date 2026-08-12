@@ -7,152 +7,92 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <style>
-    body {
-      background: linear-gradient(180deg, #020617 0%, #111827 100%);
-      color: #e2e8f0;
-    }
-    .candidate-card {
-      transition: all 0.18s ease;
-    }
-    .candidate-card.selected {
-      border-color: rgba(56, 189, 248, 0.9);
-      background: rgba(14, 116, 144, 0.12);
-      box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.25);
-    }
+    body { background: linear-gradient(180deg, #020617 0%, #111827 100%); color: #e2e8f0; }
+    .candidate-card.selected { border-color: #38bdf8; background: rgba(14, 116, 144, .2); box-shadow: 0 0 0 1px rgba(56, 189, 248, .25); }
   </style>
 </head>
 <body class="min-h-screen antialiased">
-  <div class="mx-auto max-w-md px-4 py-5">
-    <header class="mb-5 rounded-3xl border border-slate-700 bg-slate-900/80 p-4 shadow-2xl shadow-sky-900/20">
-      <div class="flex items-center justify-between gap-3">
-        <div>
-          <p class="text-[10px] font-semibold uppercase tracking-[0.22em] text-sky-400">GoCon</p>
-          <h1 class="mt-1 text-2xl font-bold text-white"><%= t.voteNow %></h1>
-        </div>
-        <div class="flex items-center gap-2">
-          <select id="languageSwitcher" aria-label="Language" class="rounded-full border border-slate-600 bg-slate-800 px-2 py-1 text-xs font-medium text-slate-200 outline-none">
-            <option value="en" <%= lang === 'en' ? 'selected' : '' %>>EN</option>
-            <option value="ru" <%= lang === 'ru' ? 'selected' : '' %>>RU</option>
-            <option value="ro" <%= lang === 'ro' ? 'selected' : '' %>>RO</option>
-          </select>
-          <a href="/?lang=<%= lang %>" class="rounded-full border border-slate-600 px-3 py-1 text-xs font-medium text-slate-200"><%= t.home %></a>
-        </div>
-      </div>
+  <main class="mx-auto max-w-md px-4 py-5">
+    <header class="mb-5 flex items-center justify-between gap-3 rounded-3xl border border-slate-700 bg-slate-900/80 p-4 shadow-xl">
+      <div><p class="text-[10px] font-semibold uppercase tracking-[.22em] text-sky-400">GoCon</p><h1 class="mt-1 text-2xl font-bold text-white"><%= t.voteNow %></h1></div>
+      <div class="flex gap-2"><select id="languageSwitcher" aria-label="<%= t.language %>" class="rounded-full border border-slate-600 bg-slate-800 px-2 py-1 text-xs text-slate-200"><option value="en" <%= lang === 'en' ? 'selected' : '' %>>EN</option><option value="ru" <%= lang === 'ru' ? 'selected' : '' %>>RU</option><option value="ro" <%= lang === 'ro' ? 'selected' : '' %>>RO</option></select><a href="/?lang=<%= lang %>" class="rounded-full border border-slate-600 px-3 py-1 text-xs text-slate-200"><%= t.home %></a></div>
     </header>
 
-    <form id="voteForm" class="space-y-5">
-      <% categories.forEach((category) => { %>
-        <section class="rounded-3xl border border-slate-700 bg-slate-900/80 p-4 shadow-lg shadow-slate-950/30">
-          <div class="mb-3 flex items-center justify-between gap-3">
-            <div class="flex items-center gap-3 min-w-0">
-              <% if (category.image) { %>
-                <img src="<%= category.image %>" alt="<%= category.displayName %>" class="h-12 w-12 rounded-xl object-cover border border-slate-600 bg-slate-800" />
-              <% } else { %>
-                <div class="flex h-12 w-12 items-center justify-center rounded-xl border border-slate-600 bg-slate-800 text-xs font-bold text-slate-200">#</div>
-              <% } %>
-              <h2 class="text-lg font-semibold text-white"><%= category.displayName %></h2>
+    <% if (!categories.length) { %>
+      <p class="rounded-2xl border border-dashed border-slate-600 p-5 text-center text-slate-300"><%= t.noVotes %></p>
+    <% } else { %>
+      <form id="voteForm">
+        <div class="mb-4 flex items-center justify-between"><p id="progressText" class="text-sm font-semibold text-sky-300"></p><div id="progressDots" class="flex gap-1"></div></div>
+        <% categories.forEach((category, categoryIndex) => { %>
+          <section class="vote-step rounded-3xl border border-slate-700 bg-slate-900/80 p-4 shadow-lg" data-step="<%= categoryIndex %>">
+            <div class="mb-4 flex items-center gap-3">
+              <% if (category.image) { %><img src="<%= category.image %>" alt="" class="h-12 w-12 rounded-xl object-cover" /><% } %>
+              <div><h2 class="text-xl font-bold text-white"><%= category.displayName %></h2><p class="text-xs text-slate-400"><%= t.categoryLabel %></p></div>
             </div>
-            <span class="rounded-full border border-slate-600 bg-slate-800 px-2 py-1 text-[10px] font-medium uppercase tracking-[0.2em] text-slate-300"><%= t.categoryLabel %></span>
-          </div>
+            <div class="space-y-3">
+              <% category.candidates.forEach((candidate) => { %>
+                <label class="candidate-card flex cursor-pointer items-center gap-3 rounded-2xl border border-slate-700 bg-slate-800/60 p-3">
+                  <input type="radio" name="<%= category.categoryId %>" value="<%= candidate.candidateId %>" class="h-4 w-4 accent-sky-500" data-category-name="<%= category.displayName %>" data-candidate-name="<%= candidate.name %>" data-candidate-code="<%= candidate.code || '' %>" data-candidate-image="<%= candidate.image || '' %>" />
+                  <% if (candidate.image) { %><img src="<%= candidate.image %>" alt="" class="h-14 w-14 rounded-xl object-cover" /><% } else { %><div class="flex h-14 w-14 items-center justify-center rounded-xl bg-slate-700 font-bold"><%= candidate.code || candidate.name.charAt(0) %></div><% } %>
+                  <div class="min-w-0"><strong class="block text-sm text-white"><%= candidate.name %></strong><span class="text-xs text-sky-300"><%= candidate.code %></span><p class="mt-1 text-xs text-slate-300"><%= candidate.description || t.noDescription %></p></div>
+                </label>
+              <% }) %>
+            </div>
+          </section>
+        <% }) %>
+        <div class="mt-5 grid grid-cols-2 gap-3"><button id="previousButton" type="button" class="rounded-2xl border border-slate-600 px-4 py-3 font-bold text-slate-100 disabled:opacity-40"><%= t.previousCategory %></button><button id="nextButton" type="button" class="rounded-2xl bg-sky-400 px-4 py-3 font-bold text-slate-950" disabled></button></div>
+      </form>
+    <% } %>
+  </main>
 
-          <div class="space-y-3">
-            <% category.candidates.forEach((candidate) => { %>
-              <label class="candidate-card flex cursor-pointer items-center gap-3 rounded-2xl border border-slate-700 bg-slate-800/60 p-3 text-left hover:border-sky-500/60 hover:bg-slate-800">
-                <input type="radio" name="<%= category.categoryId %>" value="<%= candidate.candidateId %>" class="h-4 w-4 accent-sky-500" required />
-                <% if (candidate.image) { %>
-                  <img src="<%= candidate.image %>" alt="<%= candidate.name %>" class="h-16 w-16 rounded-xl object-cover" />
-                <% } else { %>
-                  <div class="flex h-16 w-16 items-center justify-center rounded-xl bg-slate-700 text-lg font-bold text-slate-100"><%= candidate.code || candidate.name.charAt(0).toUpperCase() %></div>
-                <% } %>
-                <div class="min-w-0 flex-1">
-                  <div class="flex items-center justify-between gap-2">
-                    <strong class="block text-sm font-bold text-white"><%= candidate.name %></strong>
-                    <% if (candidate.code) { %>
-                      <span class="rounded-full border border-sky-500/40 bg-sky-500/10 px-2 py-1 text-[10px] font-semibold uppercase text-sky-200"><%= candidate.code %></span>
-                    <% } %>
-                  </div>
-                  <p class="mt-1 text-xs text-slate-300"><%= candidate.description || t.noDescription %></p>
-                </div>
-              </label>
-            <% }) %>
-          </div>
-        </section>
-      <% }) %>
-
-      <button id="submitVoteButton" type="submit" class="w-full rounded-2xl bg-emerald-500 px-4 py-3 text-base font-bold text-slate-950 shadow-lg shadow-emerald-500/20"><%= t.submitVote %></button>
-    </form>
+  <div id="reviewModal" class="fixed inset-0 z-20 hidden items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm" role="dialog" aria-modal="true">
+    <section class="w-full max-w-md rounded-3xl border border-sky-400/40 bg-slate-900 p-5 shadow-2xl"><h2 class="text-2xl font-black text-white"><%= t.youVoted %></h2><div id="reviewSummary" class="mt-4 space-y-3"></div><div class="mt-5 grid grid-cols-2 gap-3"><button id="discardButton" type="button" class="rounded-xl border border-slate-600 px-3 py-3 font-bold"><%= t.discard %></button><button id="confirmButton" type="button" class="rounded-xl bg-emerald-400 px-3 py-3 font-bold text-slate-950"><%= t.confirmVote %></button></div></section>
   </div>
 
   <script>
     const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
-    const voteForm = document.getElementById('voteForm');
-    const currentLanguage = '<%= lang %>';
+    const steps = Array.from(document.querySelectorAll('.vote-step'));
+    const total = steps.length;
+    let currentStep = 0;
+    const copy = <%- JSON.stringify({ progress: t.categoryProgress, next: t.nextCategory, review: t.reviewSubmit, telegramOnly: t.telegramOnly, failed: t.voteFailed }).replace(/</g, '\\u003c') %>;
+    const previousButton = document.getElementById('previousButton');
+    const nextButton = document.getElementById('nextButton');
+    const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]);
 
-    document.getElementById('languageSwitcher').addEventListener('change', (event) => {
-      localStorage.setItem('votingLang', event.target.value);
-      window.location.href = `/vote?lang=${encodeURIComponent(event.target.value)}`;
-    });
-    if (!localStorage.getItem('votingLang')) localStorage.setItem('votingLang', currentLanguage);
-
-    const syncSelectionStyles = () => {
-      document.querySelectorAll('.candidate-card').forEach((card) => {
-        const input = card.querySelector('input[type="radio"]');
-        card.classList.toggle('selected', input && input.checked);
-      });
+    const renderStep = () => {
+      steps.forEach((item, index) => item.classList.toggle('hidden', index !== currentStep));
+      if (!total) return;
+      document.getElementById('progressText').textContent = copy.progress.replace('{current}', currentStep + 1).replace('{total}', total);
+      document.getElementById('progressDots').innerHTML = Array.from({ length: total }, (_, index) => `<span class="h-2 w-2 rounded-full ${index === currentStep ? 'bg-sky-400' : index < currentStep ? 'bg-emerald-400' : 'bg-slate-700'}"></span>`).join('');
+      previousButton.disabled = currentStep === 0;
+      nextButton.textContent = currentStep === total - 1 ? copy.review : copy.next;
+      nextButton.disabled = !steps[currentStep].querySelector('input:checked');
     };
 
-    document.querySelectorAll('input[type="radio"]').forEach((input) => {
-      input.addEventListener('change', syncSelectionStyles);
+    document.querySelectorAll('input[type=radio]').forEach((input) => input.addEventListener('change', () => {
+      document.querySelectorAll(`input[name="${input.name}"]`).forEach((radio) => radio.closest('.candidate-card').classList.toggle('selected', radio.checked));
+      renderStep();
+    }));
+    previousButton && previousButton.addEventListener('click', () => { if (currentStep > 0) { currentStep -= 1; renderStep(); } });
+    nextButton && nextButton.addEventListener('click', () => {
+      if (!steps[currentStep].querySelector('input:checked')) return;
+      if (currentStep < total - 1) { currentStep += 1; renderStep(); return; }
+      const selected = Array.from(document.querySelectorAll('input:checked'));
+      document.getElementById('reviewSummary').innerHTML = selected.map((input) => `<article class="flex items-center gap-3 rounded-xl bg-slate-800 p-3">${input.dataset.candidateImage ? `<img src="${escapeHtml(input.dataset.candidateImage)}" class="h-12 w-12 rounded-lg object-cover" alt="" />` : ''}<div><p class="text-xs text-sky-300">${escapeHtml(input.dataset.categoryName)}</p><p class="font-bold text-white">${escapeHtml(input.dataset.candidateName)}</p><p class="text-xs text-slate-300">${escapeHtml(input.dataset.candidateCode)}</p></div></article>`).join('');
+      document.getElementById('reviewModal').classList.replace('hidden', 'flex');
     });
-
-    voteForm.addEventListener('submit', async (event) => {
-      event.preventDefault();
-      const payload = {};
-      const checkedInputs = Array.from(document.querySelectorAll('input[type="radio"]:checked'));
-
-      checkedInputs.forEach((input) => {
-        payload[input.name] = input.value;
-      });
-
-      const categoryGroups = Array.from(document.querySelectorAll('input[type="radio"]')).map((input) => input.name);
-      const missingSelection = categoryGroups.some((categoryKey, index) => {
-        return categoryKey && !checkedInputs.some((input) => input.name === categoryKey);
-      });
-
-      if (missingSelection) {
-        window.alert('<%= t.selectOptionEach %>');
-        return;
-      }
-
-      if (!tg || !tg.initData) {
-        window.alert('<%= t.telegramOnly %>');
-        return;
-      }
-
-      const result = await fetch('/api/telegram-vote', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ initData: tg.initData, categoryVotes: payload })
-      }).then((response) => response.json());
-
-      if (!result.success) {
-        window.alert(result.error || '<%= t.voteFailed %>');
-        return;
-      }
-
-      window.location.href = `/leaderboard?lang=${encodeURIComponent(localStorage.getItem('votingLang') || currentLanguage)}`;
+    document.getElementById('discardButton').addEventListener('click', () => document.getElementById('reviewModal').classList.replace('flex', 'hidden'));
+    document.getElementById('confirmButton').addEventListener('click', async () => {
+      if (!tg || !tg.initData) { window.alert(copy.telegramOnly); return; }
+      const categoryVotes = Object.fromEntries(Array.from(document.querySelectorAll('input:checked')).map((input) => [input.name, input.value]));
+      const response = await fetch('/api/telegram-vote', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ initData: tg.initData, categoryVotes }) });
+      const result = await response.json();
+      if (!result.success) { window.alert(result.error || copy.failed); return; }
+      window.location.href = `/leaderboard?lang=<%= lang %>`;
     });
-
-    if (tg) {
-      tg.ready();
-      tg.expand();
-      if (tg.MainButton) {
-        tg.MainButton.setText('<%= t.submitVote %>');
-        tg.MainButton.onClick(() => voteForm.requestSubmit());
-      }
-    }
-
-    syncSelectionStyles();
+    document.getElementById('languageSwitcher').addEventListener('change', (event) => { localStorage.setItem('votingLang', event.target.value); window.location.href = `/vote?lang=${encodeURIComponent(event.target.value)}`; });
+    if (tg) { tg.ready(); tg.expand(); }
+    renderStep();
   </script>
 </body>
 </html>

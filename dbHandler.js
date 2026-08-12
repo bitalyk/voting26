@@ -53,6 +53,8 @@ const telegramUserSchema = new Schema({
     wonPrizes: { type: [wonPrizeSchema], default: [] }
 }, { timestamps: true });
 
+telegramUserSchema.index({ username: 1 });
+
 const Settings = mongoose.model('Settings', settingsSchema);
 const Category = mongoose.model('Category', categorySchema);
 const Candidate = mongoose.model('Candidate', candidateSchema);
@@ -440,8 +442,22 @@ module.exports = {
         return result.deletedCount === 1;
     },
 
-    getTelegramUsers: async function getTelegramUsers() {
-        return TelegramUser.find({}).sort({ createdAt: -1 }).lean();
+    getTelegramUserCount: async function getTelegramUserCount() {
+        return TelegramUser.countDocuments();
+    },
+
+    searchTelegramUsers: async function searchTelegramUsers(query, limit = 20) {
+        const username = String(query || '').trim().replace(/^@/, '');
+        if (!username) {
+            return [];
+        }
+
+        const escapedUsername = username.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        return TelegramUser.find({ username: { $regex: escapedUsername, $options: 'i' } })
+            .select('telegramId username allowedPrizes wonPrizes createdAt')
+            .sort({ username: 1, createdAt: -1 })
+            .limit(Math.min(Math.max(Number(limit) || 20, 1), 50))
+            .lean();
     },
 
     updateTelegramUserPrizePermission: async function updateTelegramUserPrizePermission(telegramId, allowedPrizes) {

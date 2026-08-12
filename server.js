@@ -2,6 +2,7 @@ require('dotenv').config();
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const express = require('express');
 const mongoose = require('mongoose');
 const session = require('express-session');
@@ -12,6 +13,22 @@ const dbHandler = require('./dbHandler');
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/voting_system';
+const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+const adminTokenSecret = process.env.ADMIN_TOKEN_SECRET || 'gocon-admin-bearer-v1';
+const adminBearerToken = crypto.createHmac('sha256', adminTokenSecret).update(adminPassword).digest('base64url').slice(0, 32);
+
+function verifyAdminBearer(req, res, next) {
+    const authorization = String(req.get('authorization') || '');
+    const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
+    const expected = Buffer.from(adminBearerToken);
+    const received = Buffer.from(token);
+
+    if (expected.length !== received.length || !crypto.timingSafeEqual(expected, received)) {
+        return res.status(401).json({ success: false, error: 'Unauthorized.' });
+    }
+
+    return next();
+}
 
 const uploadDirectory = path.join(__dirname, 'public', 'uploads');
 fs.mkdirSync(uploadDirectory, { recursive: true });
@@ -37,6 +54,8 @@ const upload = multer({
 });
 
 app.locals.upload = upload;
+app.locals.adminBearerToken = adminBearerToken;
+app.locals.verifyAdminBearer = verifyAdminBearer;
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.set('trust proxy', 1);
