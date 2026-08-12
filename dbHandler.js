@@ -74,6 +74,7 @@ const mapSchema = new Schema({
     name: { type: Schema.Types.Mixed, default: {} },
     imageUrl: { type: String, default: '' },
     isDefault: { type: Boolean, default: false },
+    isVisible: { type: Boolean, default: true },
     legend: { type: [mapLegendSchema], default: [] },
     placedEvents: { type: [placedEventSchema], default: [] },
     createdAt: { type: Date, default: Date.now }
@@ -321,6 +322,10 @@ module.exports = {
         return Map.find({}).sort({ isDefault: -1, createdAt: 1 }).lean();
     },
 
+    getPublicMaps: async function getPublicMaps() {
+        return Map.find({ isVisible: { $ne: false } }).sort({ isDefault: -1, createdAt: 1 }).lean();
+    },
+
     getMapById: async function getMapById(mapId) {
         const normalizedMapId = String(mapId || '').trim();
         if (!/^\d{5}$/.test(normalizedMapId)) return null;
@@ -333,6 +338,7 @@ module.exports = {
             name: normalizeLocalizedValue(payload.name, 'Map name'),
             imageUrl: String(payload.imageUrl || '').trim(),
             isDefault: Boolean(payload.isDefault),
+            isVisible: payload.isVisible !== false,
             legend: [],
             
             placedEvents: []
@@ -349,6 +355,7 @@ module.exports = {
         if (payload.name !== undefined) map.name = normalizeLocalizedValue(payload.name, 'Map name');
         if (payload.imageUrl !== undefined) map.imageUrl = String(payload.imageUrl || '').trim();
         if (payload.isDefault !== undefined) map.isDefault = Boolean(payload.isDefault);
+        if (payload.isVisible !== undefined) map.isVisible = Boolean(payload.isVisible);
         if (payload.legend !== undefined || payload.placedEvents !== undefined) {
             const editor = normalizeMapEditorPayload({ legend: payload.legend === undefined ? map.legend : payload.legend, placedEvents: payload.placedEvents === undefined ? map.placedEvents : payload.placedEvents });
             const typeIds = [...new Set([...editor.legend.map((item) => item.eventTypeId), ...editor.placedEvents.map((item) => item.eventTypeId)])];
