@@ -7,7 +7,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <style>body { background: #0b1220; color: #e2e8f0; }</style>
 </head>
-<body class="min-h-screen antialiased">
+<body class="min-h-screen antialiased" data-admin-authenticated="<%= isLoggedIn ? 'true' : 'false' %>">
   <main class="mx-auto max-w-3xl px-4 py-8">
     <% if (!isLoggedIn) { %>
       <section class="mx-auto max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl">
@@ -56,18 +56,19 @@
       if (!response.ok || !result.success) throw new Error(result.error || 'Request failed.');
       window.location.href = result.redirect || '/admin';
     };
-    <% if (!isLoggedIn) { %>
-    document.getElementById('adminLoginForm').addEventListener('submit', async (event) => {
-      event.preventDefault();
-      const response = await fetch(event.currentTarget.action, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: event.currentTarget.password.value }) });
-      const result = await response.json();
-      if (!response.ok || !result.success) { window.alert(result.error || 'Invalid password.'); return; }
-      sessionStorage.setItem('adminBearerToken', result.token);
-      window.location.href = result.redirect;
-    });
-    <% } else { %>
-    document.querySelectorAll('form').forEach((form) => form.addEventListener('submit', (event) => { event.preventDefault(); submitAdminForm(form).catch((error) => window.alert(error.message)); }));
-    <% } %>
+    const isAdminAuthenticated = document.body.dataset.adminAuthenticated === 'true';
+    if (!isAdminAuthenticated) {
+      document.getElementById('adminLoginForm').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const response = await fetch(event.currentTarget.action, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: event.currentTarget.password.value }) });
+        const result = await response.json();
+        if (!response.ok || !result.success) { window.alert(result.error || 'Invalid password.'); return; }
+        sessionStorage.setItem('adminBearerToken', result.token);
+        window.location.href = result.redirect;
+      });
+    } else {
+      document.querySelectorAll('form').forEach((form) => form.addEventListener('submit', (event) => { event.preventDefault(); submitAdminForm(form).catch((error) => window.alert(error.message)); }));
+    }
   </script>
 </body>
 </html>
