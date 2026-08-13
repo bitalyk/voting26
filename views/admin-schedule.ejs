@@ -20,12 +20,12 @@
         <article class="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-700 bg-slate-900 p-4 shadow-lg">
           <div class="min-w-0">
             <h2 class="truncate font-bold text-white"><%= event.title.en || event.title.ru || event.title.ro || 'Untitled event' %></h2>
-            <p class="mt-1 text-sm text-sky-300"><%= new Date(event.startTime).toLocaleString() %></p>
+            <p class="mt-1 text-sm text-sky-300">Starts: <%= new Date(event.startTime).toLocaleString() %><% if (event.endTime) { %> | Ends: <%= new Date(event.endTime).toLocaleString() %><% } else { %> | Ends: at the next event<% } %></p>
             <% if (event.description.en || event.description.ru || event.description.ro) { %><p class="mt-2 text-sm text-slate-300"><%= event.description.en || event.description.ru || event.description.ro %></p><% } %>
             <p class="mt-2 text-xs text-slate-500">ID: <%= event.eventId %><% if (event.notified) { %> | Notification sent<% } %></p>
           </div>
           <div class="flex shrink-0 gap-2">
-            <button type="button" class="edit-event rounded-lg border border-slate-500 px-3 py-2 text-sm font-semibold" data-id="<%= event.eventId %>" data-title-en="<%= event.title.en || '' %>" data-title-ru="<%= event.title.ru || '' %>" data-title-ro="<%= event.title.ro || '' %>" data-description-en="<%= event.description.en || '' %>" data-description-ru="<%= event.description.ru || '' %>" data-description-ro="<%= event.description.ro || '' %>" data-start-time="<%= new Date(event.startTime).toISOString().slice(0, 16) %>">Edit</button>
+            <button type="button" class="edit-event rounded-lg border border-slate-500 px-3 py-2 text-sm font-semibold" data-id="<%= event.eventId %>" data-title-en="<%= event.title.en || '' %>" data-title-ru="<%= event.title.ru || '' %>" data-title-ro="<%= event.title.ro || '' %>" data-description-en="<%= event.description.en || '' %>" data-description-ru="<%= event.description.ru || '' %>" data-description-ro="<%= event.description.ro || '' %>" data-start-time="<%= new Date(event.startTime).toISOString().slice(0, 16) %>" data-end-time="<%= event.endTime ? new Date(event.endTime).toISOString().slice(0, 16) : '' %>">Edit</button>
             <form method="POST" action="/admin/schedule/<%= encodeURIComponent(event.eventId) %>/delete" onsubmit="return confirm('Delete this schedule event?');"><button class="rounded-lg border border-red-500/50 px-3 py-2 text-sm font-semibold text-red-200">Delete</button></form>
           </div>
         </article>
@@ -44,6 +44,7 @@
         <label class="text-sm">Description (Russian)<textarea name="descriptionRu" rows="2" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white"></textarea></label>
         <label class="text-sm">Description (Romanian)<textarea name="descriptionRo" rows="2" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white"></textarea></label>
         <label class="text-sm">Start time<input name="startTime" type="datetime-local" required class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white" /></label>
+        <label class="text-sm">Until time (optional)<input name="endTime" type="datetime-local" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white" /><span class="mt-1 block text-xs text-slate-400">Leave blank to end when the next event starts.</span></label>
         <button class="mt-2 rounded-lg bg-emerald-400 px-4 py-2.5 font-bold text-slate-950">Create event</button>
       </div>
     </form>
@@ -61,6 +62,7 @@
         <label class="text-sm">Description (Russian)<textarea id="editDescriptionRu" name="descriptionRu" rows="2" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white"></textarea></label>
         <label class="text-sm">Description (Romanian)<textarea id="editDescriptionRo" name="descriptionRo" rows="2" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white"></textarea></label>
         <label class="text-sm">Start time<input id="editStartTime" name="startTime" type="datetime-local" required class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white" /></label>
+        <label class="text-sm">Until time (optional)<input id="editEndTime" name="endTime" type="datetime-local" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white" /><span class="mt-1 block text-xs text-slate-400">Leave blank to end when the next event starts.</span></label>
         <button class="mt-2 rounded-lg bg-emerald-400 px-4 py-2.5 font-bold text-slate-950">Save event</button>
       </div>
     </form>
@@ -89,6 +91,7 @@
       document.getElementById('editDescriptionRu').value = button.dataset.descriptionRu;
       document.getElementById('editDescriptionRo').value = button.dataset.descriptionRo;
       document.getElementById('editStartTime').value = button.dataset.startTime;
+      document.getElementById('editEndTime').value = button.dataset.endTime;
       showModal('editModal');
     });
     document.querySelectorAll('form').forEach((form) => form.addEventListener('submit', (event) => { event.preventDefault(); submitAdminForm(form).catch((error) => window.alert(error.message)); }));

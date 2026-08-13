@@ -141,7 +141,12 @@
     const formatScheduleTime = (event) => event ? new Intl.DateTimeFormat(lang === 'ru' ? 'ru-RU' : (lang === 'ro' ? 'ro-RO' : 'en-US'), { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(event.startTime)) : '';
     const renderSchedule = () => {
       const now = Date.now();
-      const currentEvents = scheduleEvents.filter((event) => new Date(event.startTime).getTime() <= now);
+      const currentEvents = scheduleEvents.filter((event, index) => {
+        const startTime = new Date(event.startTime).getTime();
+        const nextStartTime = scheduleEvents[index + 1] ? new Date(scheduleEvents[index + 1].startTime).getTime() : Infinity;
+        const endTime = event.endTime ? new Date(event.endTime).getTime() : nextStartTime;
+        return startTime <= now && now < endTime;
+      });
       const current = currentEvents.length ? currentEvents[currentEvents.length - 1] : null;
       const next = scheduleEvents.find((event) => new Date(event.startTime).getTime() > now) || null;
       document.getElementById('currentScheduleTitle').textContent = current ? scheduleTitle(current) : '<%= t.noCurrentEvent %>';

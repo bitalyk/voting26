@@ -114,11 +114,11 @@ router.post('/admin/settings', adminMutationGuard, asyncRoute(async (req, res) =
 
 router.get('/admin/schedule', adminGuard, asyncRoute(async (req, res) => res.render('admin-schedule', { ...getPageContext(req), scheduleEvents: await dbHandler.getScheduleEvents() })));
 router.post('/admin/schedule', adminMutationGuard, asyncRoute(async (req, res) => {
-    await dbHandler.createScheduleEvent({ title: { en: req.body.titleEn, ru: req.body.titleRu, ro: req.body.titleRo }, description: { en: req.body.descriptionEn, ru: req.body.descriptionRu, ro: req.body.descriptionRo }, startTime: req.body.startTime });
+    await dbHandler.createScheduleEvent({ title: { en: req.body.titleEn, ru: req.body.titleRu, ro: req.body.titleRo }, description: { en: req.body.descriptionEn, ru: req.body.descriptionRu, ro: req.body.descriptionRo }, startTime: req.body.startTime, endTime: req.body.endTime });
     return res.json({ success: true, redirect: '/admin/schedule' });
 }));
 router.post('/admin/schedule/:eventId/update', adminMutationGuard, asyncRoute(async (req, res) => {
-    const event = await dbHandler.updateScheduleEvent(req.params.eventId, { title: { en: req.body.titleEn, ru: req.body.titleRu, ro: req.body.titleRo }, description: { en: req.body.descriptionEn, ru: req.body.descriptionRu, ro: req.body.descriptionRo }, startTime: req.body.startTime });
+    const event = await dbHandler.updateScheduleEvent(req.params.eventId, { title: { en: req.body.titleEn, ru: req.body.titleRu, ro: req.body.titleRo }, description: { en: req.body.descriptionEn, ru: req.body.descriptionRu, ro: req.body.descriptionRo }, startTime: req.body.startTime, endTime: req.body.endTime });
     if (!event) return res.status(404).json({ success: false, error: 'Schedule event not found.' });
     return res.json({ success: true, redirect: '/admin/schedule' });
 }));

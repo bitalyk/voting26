@@ -93,6 +93,7 @@ const scheduleEventSchema = new Schema({
     title: { type: Schema.Types.Mixed, required: true },
     description: { type: Schema.Types.Mixed, default: {} },
     startTime: { type: Date, required: true, index: true },
+    endTime: { type: Date, default: null },
     order: { type: Number, required: true, default: 0 },
     notified: { type: Boolean, default: false, index: true }
 }, { timestamps: true });
@@ -244,6 +245,15 @@ function normalizeScheduleEventPayload(payload = {}) {
         throw new Error('A valid event start time is required.');
     }
 
+    const hasEndTime = payload.endTime !== undefined && payload.endTime !== null && String(payload.endTime).trim() !== '';
+    const endTime = hasEndTime ? toDateValue(payload.endTime) : null;
+    if (hasEndTime && !endTime) {
+        throw new Error('Event end time must be valid.');
+    }
+    if (endTime && endTime.getTime() <= startTime.getTime()) {
+        throw new Error('Event end time must be after its start time.');
+    }
+
     const title = normalizeLocalizedValue(payload.title, 'Event title', true);
     if (!title.en) {
         throw new Error('Event title in English is required.');
@@ -254,7 +264,7 @@ function normalizeScheduleEventPayload(payload = {}) {
     description.en = description.en || '';
     description.ru = description.ru || description.en;
     description.ro = description.ro || description.en;
-    return { title, description, startTime };
+    return { title, description, startTime, endTime };
 }
 
 function normalizePercent(value, label) {
@@ -372,12 +382,14 @@ module.exports = {
         const normalized = normalizeScheduleEventPayload({
             title: payload.title === undefined ? event.title : payload.title,
             description: payload.description === undefined ? event.description : payload.description,
-            startTime: payload.startTime === undefined ? event.startTime : payload.startTime
+            startTime: payload.startTime === undefined ? event.startTime : payload.startTime,
+            endTime: payload.endTime === undefined ? event.endTime : payload.endTime
         });
         event.title = normalized.title;
         event.description = normalized.description;
         const startTimeChanged = event.startTime.getTime() !== normalized.startTime.getTime();
         event.startTime = normalized.startTime;
+        event.endTime = normalized.endTime;
         event.order = normalized.startTime.getTime();
         if (startTimeChanged) event.notified = false;
         await event.save();
