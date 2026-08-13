@@ -49,6 +49,7 @@ const telegramUserSchema = new Schema({
     voted: { type: Boolean, default: false },
     votedAt: { type: Date },
     languageCode: { type: String, default: 'en' },
+    scheduleNotificationsEnabled: { type: Boolean, default: false },
     allowedPrizes: { type: Boolean, default: false },
     wonPrizes: { type: [wonPrizeSchema], default: [] }
 }, { timestamps: true });
@@ -87,6 +88,15 @@ const mapEventTypeSchema = new Schema({
     symbolIcon: { type: String, default: '' }
 }, { timestamps: true });
 
+const scheduleEventSchema = new Schema({
+    eventId: { type: String, required: true, unique: true, index: true },
+    title: { type: Schema.Types.Mixed, required: true },
+    description: { type: Schema.Types.Mixed, default: {} },
+    startTime: { type: Date, required: true, index: true },
+    order: { type: Number, required: true, default: 0 },
+    notified: { type: Boolean, default: false, index: true }
+}, { timestamps: true });
+
 const Settings = mongoose.model('Settings', settingsSchema);
 const Category = mongoose.model('Category', categorySchema);
 const Candidate = mongoose.model('Candidate', candidateSchema);
@@ -94,6 +104,7 @@ const Prize = mongoose.model('Prize', prizeSchema);
 const TelegramUser = mongoose.model('TelegramUser', telegramUserSchema);
 const Map = mongoose.model('Map', mapSchema);
 const MapEventType = mongoose.model('MapEventType', mapEventTypeSchema);
+const ScheduleEvent = mongoose.model('ScheduleEvent', scheduleEventSchema);
 
 async function generateUniqueFiveDigitId(Model, fieldName) {
     for (let attempt = 0; attempt < 20; attempt += 1) {
@@ -227,6 +238,25 @@ function normalizeLocalizedValue(value, label, required = false) {
     return localized;
 }
 
+function normalizeScheduleEventPayload(payload = {}) {
+    const startTime = toDateValue(payload.startTime);
+    if (!startTime) {
+        throw new Error('A valid event start time is required.');
+    }
+
+    const title = normalizeLocalizedValue(payload.title, 'Event title', true);
+    if (!title.en) {
+        throw new Error('Event title in English is required.');
+    }
+    title.ru = title.ru || title.en;
+    title.ro = title.ro || title.en;
+    const description = normalizeLocalizedValue(payload.description, 'Event description');
+    description.en = description.en || '';
+    description.ru = description.ru || description.en;
+    description.ro = description.ro || description.en;
+    return { title, description, startTime };
+}
+
 function normalizePercent(value, label) {
     const percent = Number(value);
     if (!Number.isFinite(percent) || percent < 0 || percent > 100) throw new Error(`${label} must be between 0 and 100.`);
@@ -316,6 +346,69 @@ module.exports = {
 
         await settings.save();
         return settings.toObject();
+    },
+
+    getScheduleEvents: async function getScheduleEvents() {
+        return ScheduleEvent.find({}).sort({ startTime: 1, eventId: 1 }).lean();
+    },
+
+    createScheduleEvent: async function createScheduleEvent(payload = {}) {
+        const event = await ScheduleEvent.create({
+            eventId: await generateUniqueFiveDigitId(ScheduleEvent, 'eventId'),
+            ...normalizeScheduleEventPayload(payload),
+            order: 0,
+            notified: false
+        });
+        event.order = event.startTime.getTime();
+        await event.save();
+        return event.toObject();
+    },
+
+    updateScheduleEvent: async function updateScheduleEvent(eventId, payload = {}) {
+        const normalizedEventId = String(eventId || '').trim();
+        if (!/^\d{5}$/.test(normalizedEventId)) return null;
+        const event = await ScheduleEvent.findOne({ eventId: normalizedEventId });
+        if (!event) return null;
+        const normalized = normalizeScheduleEventPayload({
+            title: payload.title === undefined ? event.title : payload.title,
+            description: payload.description === undefined ? event.description : payload.description,
+            startTime: payload.startTime === undefined ? event.startTime : payload.startTime
+        });
+        event.title = normalized.title;
+        event.description = normalized.description;
+        const startTimeChanged = event.startTime.getTime() !== normalized.startTime.getTime();
+        event.startTime = normalized.startTime;
+        event.order = normalized.startTime.getTime();
+        if (startTimeChanged) event.notified = false;
+        await event.save();
+        return event.toObject();
+    },
+
+    deleteScheduleEvent: async function deleteScheduleEvent(eventId) {
+        const result = await ScheduleEvent.deleteOne({ eventId: String(eventId || '').trim() });
+        return result.deletedCount === 1;
+    },
+
+    getDueUnnotifiedScheduleEvents: async function getDueUnnotifiedScheduleEvents(now = new Date()) {
+        return ScheduleEvent.find({ startTime: { $lte: now }, notified: false }).sort({ startTime: 1, eventId: 1 }).lean();
+    },
+
+    markScheduleEventNotified: async function markScheduleEventNotified(eventId) {
+        const result = await ScheduleEvent.updateOne({ eventId: String(eventId || '').trim(), notified: false }, { $set: { notified: true } });
+        return result.modifiedCount === 1;
+    },
+
+    getScheduleNotificationUsers: async function getScheduleNotificationUsers() {
+        return TelegramUser.find({ scheduleNotificationsEnabled: true }).select('telegramId languageCode').lean();
+    },
+
+    updateScheduleNotifications: async function updateScheduleNotifications(telegramId, enabled) {
+        const user = await TelegramUser.findOneAndUpdate(
+            { telegramId: String(telegramId) },
+            { $set: { scheduleNotificationsEnabled: Boolean(enabled) } },
+            { new: true }
+        );
+        return user ? user.toObject() : null;
     },
 
     getMaps: async function getMaps() {

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Manage Schedule</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>body { background: #0b1220; color: #e2e8f0; }</style>
+</head>
+<body class="min-h-screen antialiased">
+  <main class="mx-auto max-w-4xl px-4 py-8">
+    <header class="mb-6 flex flex-wrap items-center justify-between gap-4">
+      <div><a href="/admin" class="text-sm text-sky-400">Settings</a><h1 class="mt-1 text-3xl font-bold text-white">Schedule</h1><p class="mt-1 text-sm text-slate-400">Events are ordered by scheduled start time.</p></div>
+      <button id="openCreateModal" type="button" class="rounded-lg bg-violet-400 px-4 py-2.5 font-bold text-slate-950">Add Event</button>
+    </header>
+
+    <section class="space-y-3">
+      <% if (!scheduleEvents.length) { %><p class="rounded-xl border border-dashed border-slate-600 p-5 text-slate-300">No schedule events have been created.</p><% } %>
+      <% scheduleEvents.forEach((event) => { %>
+        <article class="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-700 bg-slate-900 p-4 shadow-lg">
+          <div class="min-w-0">
+            <h2 class="truncate font-bold text-white"><%= event.title.en || event.title.ru || event.title.ro || 'Untitled event' %></h2>
+            <p class="mt-1 text-sm text-sky-300"><%= new Date(event.startTime).toLocaleString() %></p>
+            <% if (event.description.en || event.description.ru || event.description.ro) { %><p class="mt-2 text-sm text-slate-300"><%= event.description.en || event.description.ru || event.description.ro %></p><% } %>
+            <p class="mt-2 text-xs text-slate-500">ID: <%= event.eventId %><% if (event.notified) { %> | Notification sent<% } %></p>
+          </div>
+          <div class="flex shrink-0 gap-2">
+            <button type="button" class="edit-event rounded-lg border border-slate-500 px-3 py-2 text-sm font-semibold" data-id="<%= event.eventId %>" data-title-en="<%= event.title.en || '' %>" data-title-ru="<%= event.title.ru || '' %>" data-title-ro="<%= event.title.ro || '' %>" data-description-en="<%= event.description.en || '' %>" data-description-ru="<%= event.description.ru || '' %>" data-description-ro="<%= event.description.ro || '' %>" data-start-time="<%= new Date(event.startTime).toISOString().slice(0, 16) %>">Edit</button>
+            <form method="POST" action="/admin/schedule/<%= encodeURIComponent(event.eventId) %>/delete" onsubmit="return confirm('Delete this schedule event?');"><button class="rounded-lg border border-red-500/50 px-3 py-2 text-sm font-semibold text-red-200">Delete</button></form>
+          </div>
+        </article>
+      <% }) %>
+    </section>
+  </main>
+
+  <div id="createModal" class="fixed inset-0 hidden items-center justify-center bg-slate-950/75 p-4">
+    <form method="POST" action="/admin/schedule" class="max-h-full w-full max-w-xl overflow-y-auto rounded-xl border border-slate-700 bg-slate-900 p-5 shadow-2xl">
+      <div class="flex items-center justify-between"><h2 class="text-xl font-bold text-white">Add event</h2><button type="button" data-close-modal="createModal" class="text-slate-300">Close</button></div>
+      <div class="mt-5 grid gap-3">
+        <label class="text-sm">Title (English)<input name="titleEn" required class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white" /></label>
+        <label class="text-sm">Title (Russian)<input name="titleRu" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white" /></label>
+        <label class="text-sm">Title (Romanian)<input name="titleRo" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white" /></label>
+        <label class="text-sm">Description (English)<textarea name="descriptionEn" rows="2" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white"></textarea></label>
+        <label class="text-sm">Description (Russian)<textarea name="descriptionRu" rows="2" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white"></textarea></label>
+        <label class="text-sm">Description (Romanian)<textarea name="descriptionRo" rows="2" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white"></textarea></label>
+        <label class="text-sm">Start time<input name="startTime" type="datetime-local" required class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white" /></label>
+        <button class="mt-2 rounded-lg bg-emerald-400 px-4 py-2.5 font-bold text-slate-950">Create event</button>
+      </div>
+    </form>
+  </div>
+
+  <div id="editModal" class="fixed inset-0 hidden items-center justify-center bg-slate-950/75 p-4">
+    <form id="editEventForm" method="POST" class="max-h-full w-full max-w-xl overflow-y-auto rounded-xl border border-slate-700 bg-slate-900 p-5 shadow-2xl">
+      <div class="flex items-center justify-between"><h2 class="text-xl font-bold text-white">Edit event</h2><button type="button" data-close-modal="editModal" class="text-slate-300">Close</button></div>
+      <p id="editEventId" class="mt-2 text-sm text-slate-400"></p>
+      <div class="mt-5 grid gap-3">
+        <label class="text-sm">Title (English)<input id="editTitleEn" name="titleEn" required class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white" /></label>
+        <label class="text-sm">Title (Russian)<input id="editTitleRu" name="titleRu" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white" /></label>
+        <label class="text-sm">Title (Romanian)<input id="editTitleRo" name="titleRo" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white" /></label>
+        <label class="text-sm">Description (English)<textarea id="editDescriptionEn" name="descriptionEn" rows="2" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white"></textarea></label>
+        <label class="text-sm">Description (Russian)<textarea id="editDescriptionRu" name="descriptionRu" rows="2" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white"></textarea></label>
+        <label class="text-sm">Description (Romanian)<textarea id="editDescriptionRo" name="descriptionRo" rows="2" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white"></textarea></label>
+        <label class="text-sm">Start time<input id="editStartTime" name="startTime" type="datetime-local" required class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white" /></label>
+        <button class="mt-2 rounded-lg bg-emerald-400 px-4 py-2.5 font-bold text-slate-950">Save event</button>
+      </div>
+    </form>
+  </div>
+
+  <script>
+    const showModal = (id) => document.getElementById(id).classList.replace('hidden', 'flex');
+    const hideModal = (id) => document.getElementById(id).classList.replace('flex', 'hidden');
+    const adminToken = () => sessionStorage.getItem('adminBearerToken');
+    const submitAdminForm = async (form) => {
+      if (!adminToken()) { window.location.href = '/admin/login'; return; }
+      const response = await fetch(form.action, { method: form.method || 'POST', headers: { Authorization: `Bearer ${adminToken()}`, 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' }, body: new URLSearchParams(new FormData(form)) });
+      const result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || 'Request failed.');
+      window.location.href = result.redirect || '/admin/schedule';
+    };
+    document.getElementById('openCreateModal').onclick = () => showModal('createModal');
+    document.querySelectorAll('[data-close-modal]').forEach((button) => button.onclick = () => hideModal(button.dataset.closeModal));
+    document.querySelectorAll('.edit-event').forEach((button) => button.onclick = () => {
+      document.getElementById('editEventForm').action = `/admin/schedule/${encodeURIComponent(button.dataset.id)}/update`;
+      document.getElementById('editEventId').textContent = `Event ID: ${button.dataset.id}`;
+      document.getElementById('editTitleEn').value = button.dataset.titleEn;
+      document.getElementById('editTitleRu').value = button.dataset.titleRu;
+      document.getElementById('editTitleRo').value = button.dataset.titleRo;
+      document.getElementById('editDescriptionEn').value = button.dataset.descriptionEn;
+      document.getElementById('editDescriptionRu').value = button.dataset.descriptionRu;
+      document.getElementById('editDescriptionRo').value = button.dataset.descriptionRo;
+      document.getElementById('editStartTime').value = button.dataset.startTime;
+      showModal('editModal');
+    });
+    document.querySelectorAll('form').forEach((form) => form.addEventListener('submit', (event) => { event.preventDefault(); submitAdminForm(form).catch((error) => window.alert(error.message)); }));
+  </script>
+</body>
+</html>

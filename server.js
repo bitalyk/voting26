@@ -16,6 +16,7 @@ const MONGO_URI = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/voting_sys
 const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
 const adminTokenSecret = process.env.ADMIN_TOKEN_SECRET || 'gocon-admin-bearer-v1';
 const adminBearerToken = crypto.createHmac('sha256', adminTokenSecret).update(adminPassword).digest('base64url').slice(0, 32);
+let scheduleNotificationCheckRunning = false;
 
 function verifyAdminBearer(req, res, next) {
     const authorization = String(req.get('authorization') || '');
@@ -91,10 +92,67 @@ app.use((req, res) => {
     res.status(404).render('error', { message: 'The requested page could not be found.', lang });
 });
 
+function scheduleNotificationMessage(event, languageCode) {
+    const title = dbHandler.resolveLocalizedText(event.title, languageCode) || dbHandler.resolveLocalizedText(event.title, 'en');
+    const messages = {
+        en: `Event Starting Now: ${title}!`,
+        ru: `Событие начинается сейчас: ${title}!`,
+        ro: `Evenimentul începe acum: ${title}!`
+    };
+    return `\u{1F514} ${messages[languageCode] || messages.en}`;
+}
+
+async function sendTelegramScheduleNotification(telegramId, text) {
+    const botToken = process.env.TELEGRAM_BOT_TOKEN;
+    if (!botToken) {
+        throw new Error('TELEGRAM_BOT_TOKEN is not configured.');
+    }
+
+    const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: telegramId, text }),
+        signal: AbortSignal.timeout(10000)
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok || !result.ok) {
+        throw new Error(result.description || `Telegram API request failed with status ${response.status}.`);
+    }
+}
+
+async function checkScheduleNotifications() {
+    if (scheduleNotificationCheckRunning || !process.env.TELEGRAM_BOT_TOKEN) return;
+    scheduleNotificationCheckRunning = true;
+    try {
+        const dueEvents = await dbHandler.getDueUnnotifiedScheduleEvents();
+        if (!dueEvents.length) return;
+
+        const recipients = await dbHandler.getScheduleNotificationUsers();
+        for (const event of dueEvents) {
+            const deliveries = await Promise.allSettled(recipients.map((user) => sendTelegramScheduleNotification(
+                user.telegramId,
+                scheduleNotificationMessage(event, user.languageCode)
+            )));
+            deliveries.forEach((delivery, index) => {
+                if (delivery.status === 'rejected') {
+                    console.error(`Schedule notification failed for Telegram user ${recipients[index].telegramId}:`, delivery.reason.message);
+                }
+            });
+            await dbHandler.markScheduleEventNotified(event.eventId);
+        }
+    } catch (error) {
+        console.error('Schedule notification check failed:', error.message);
+    } finally {
+        scheduleNotificationCheckRunning = false;
+    }
+}
+
 mongoose.connect(MONGO_URI)
     .then(async () => {
         console.log('Connected to MongoDB successfully');
         await dbHandler.seedDatabaseDefaults();
+        await checkScheduleNotifications();
+        setInterval(checkScheduleNotifications, 60000);
         const server = app.listen(PORT, () => {
             console.log(`Server is running at http://localhost:${PORT}`);
         });
