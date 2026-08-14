@@ -110,6 +110,7 @@ const layoutPanelSchema = new Schema({
     panelId: { type: String, required: true },
     visible: { type: Boolean, default: true },
     order: { type: Number, required: true },
+    brand: { type: localizedTextSchema, default: () => ({}) },
     title: { type: localizedTextSchema, default: () => ({}) },
     description: { type: localizedTextSchema, default: () => ({}) }
 }, { _id: false });
@@ -131,7 +132,7 @@ const ScheduleEvent = mongoose.model('ScheduleEvent', scheduleEventSchema);
 const SiteConfig = mongoose.model('SiteConfig', siteConfigSchema);
 
 const MAIN_PAGE_DEFAULTS = [
-    { panelId: 'header', visible: true, order: 0, title: { en: 'GoCon Voting Event', ru: 'Голосование GoCon', ro: 'Votarea GoCon' }, description: {} },
+    { panelId: 'header', visible: true, order: 0, brand: { en: 'GoCon', ru: 'GoCon', ro: 'GoCon' }, title: { en: 'GoCon Voting Event', ru: 'Голосование GoCon', ro: 'Votarea GoCon' }, description: {} },
     { panelId: 'schedule', visible: true, order: 1, title: { en: 'Live Schedule', ru: 'Расписание', ro: 'Program live' }, description: {} },
     { panelId: 'voting', visible: true, order: 2, title: { en: 'GoCon Voting Event', ru: 'Голосование GoCon', ro: 'Votarea GoCon' }, description: { en: 'GoCon Voting Event - Choose your favorite projects and help shape the final results.', ru: 'Голосование GoCon - Выберите любимые проекты и помогите определить итоговые результаты.', ro: 'Votarea GoCon - Alege proiectele preferate si ajuta la stabilirea rezultatelor finale.' } },
     { panelId: 'startVoting', visible: true, order: 3, title: { en: 'Start Voting', ru: 'Начать голосование', ro: 'Incepe votul' }, description: {} },
@@ -285,6 +286,7 @@ function cloneLayoutDefaults(defaults) {
         panelId: panel.panelId,
         visible: panel.visible,
         order: panel.order,
+        brand: { ...(panel.brand || {}) },
         title: { ...panel.title },
         description: { ...panel.description }
     }));

@@ -67,6 +67,7 @@ const categoryPath = (categoryId) => `/admin/categories/${encodeURIComponent(cat
 function visibleLocalizedPanels(layout, lang) {
     return (layout || []).filter((panel) => panel.visible).sort((left, right) => left.order - right.order).map((panel) => ({
         ...panel,
+        displayBrand: dbHandler.resolveLocalizedText(panel.brand, lang) || 'GoCon',
         displayTitle: dbHandler.resolveLocalizedText(panel.title, lang),
         displayDescription: dbHandler.resolveLocalizedText(panel.description, lang)
     }));
@@ -79,6 +80,7 @@ function layoutPayloadFromForm(layout, body = {}) {
             panelId: key,
             visible: body[`visible_${key}`] === 'on',
             order: body[`order_${key}`],
+            brand: key === 'header' ? { en: body.headerBrandEn, ru: body.headerBrandRu, ro: body.headerBrandRo } : panel.brand,
             title: { en: body[`${key}TitleEn`], ru: body[`${key}TitleRu`], ro: body[`${key}TitleRo`] },
             description: { en: body[`${key}DescriptionEn`], ru: body[`${key}DescriptionRu`], ro: body[`${key}DescriptionRo`] }
         };
