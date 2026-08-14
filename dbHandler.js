@@ -85,10 +85,18 @@ const mapSchema = new Schema({
 
 const mapEventTypeSchema = new Schema({
     eventTypeId: { type: String, required: true, unique: true, index: true },
+    categoryId: { type: String, default: '', index: true },
     name: { type: Schema.Types.Mixed, default: {} },
     description: { type: Schema.Types.Mixed, default: {} },
     symbolIcon: { type: String, default: '' }
 }, { timestamps: true });
+
+const markerCategorySchema = new Schema({
+    categoryId: { type: String, required: true, unique: true, index: true },
+    name: { type: Schema.Types.Mixed, required: true, default: {} },
+    color: { type: String, required: true, default: '#38bdf8' },
+    createdAt: { type: Date, default: Date.now }
+});
 
 const scheduleEventSchema = new Schema({
     eventId: { type: String, required: true, unique: true, index: true },
@@ -128,6 +136,7 @@ const Prize = mongoose.model('Prize', prizeSchema);
 const TelegramUser = mongoose.model('TelegramUser', telegramUserSchema);
 const Map = mongoose.model('Map', mapSchema);
 const MapEventType = mongoose.model('MapEventType', mapEventTypeSchema);
+const MarkerCategory = mongoose.model('MarkerCategory', markerCategorySchema);
 const ScheduleEvent = mongoose.model('ScheduleEvent', scheduleEventSchema);
 const SiteConfig = mongoose.model('SiteConfig', siteConfigSchema);
 
@@ -363,6 +372,14 @@ function normalizePercent(value, label) {
     const percent = Number(value);
     if (!Number.isFinite(percent) || percent < 0 || percent > 100) throw new Error(`${label} must be between 0 and 100.`);
     return Math.round(percent * 1000) / 1000;
+}
+
+function normalizeMarkerCategoryColor(value) {
+    const color = String(value || '').trim();
+    if (!/^#(?:[\da-f]{3}|[\da-f]{4}|[\da-f]{6}|[\da-f]{8})$/i.test(color) && !/^[a-z]+$/i.test(color)) {
+        throw new Error('Marker category color must be a HEX value or CSS color name.');
+    }
+    return color;
 }
 
 function normalizeMapEditorPayload(payload = {}) {
@@ -628,9 +645,45 @@ module.exports = {
         return MapEventType.find({}).sort({ createdAt: 1 }).lean();
     },
 
+    getMarkerCategories: async function getMarkerCategories() {
+        return MarkerCategory.find({}).sort({ createdAt: 1 }).lean();
+    },
+
+    createMarkerCategory: async function createMarkerCategory(payload = {}) {
+        const category = await MarkerCategory.create({
+            categoryId: await generateUniqueFiveDigitId(MarkerCategory, 'categoryId'),
+            name: normalizeLocalizedValue(payload.name, 'Marker category name', true),
+            color: normalizeMarkerCategoryColor(payload.color)
+        });
+        return category.toObject();
+    },
+
+    updateMarkerCategory: async function updateMarkerCategory(categoryId, payload = {}) {
+        const normalizedCategoryId = String(categoryId || '').trim();
+        if (!/^\d{5}$/.test(normalizedCategoryId)) return null;
+        const category = await MarkerCategory.findOne({ categoryId: normalizedCategoryId });
+        if (!category) return null;
+        if (payload.name !== undefined) category.name = normalizeLocalizedValue(payload.name, 'Marker category name', true);
+        if (payload.color !== undefined) category.color = normalizeMarkerCategoryColor(payload.color);
+        await category.save();
+        return category.toObject();
+    },
+
+    deleteMarkerCategory: async function deleteMarkerCategory(categoryId) {
+        const normalizedCategoryId = String(categoryId || '').trim();
+        if (!/^\d{5}$/.test(normalizedCategoryId)) return false;
+        const result = await MarkerCategory.deleteOne({ categoryId: normalizedCategoryId });
+        if (result.deletedCount !== 1) return false;
+        await MapEventType.updateMany({ categoryId: normalizedCategoryId }, { $unset: { categoryId: '' } });
+        return true;
+    },
+
     createMapEventType: async function createMapEventType(payload = {}) {
+        const categoryId = String(payload.categoryId || '').trim();
+        if (categoryId && !await MarkerCategory.exists({ categoryId })) throw new Error('Selected marker category no longer exists.');
         const eventType = await MapEventType.create({
             eventTypeId: await generateUniqueFiveDigitId(MapEventType, 'eventTypeId'),
+            categoryId,
             name: normalizeLocalizedValue(payload.name, 'Event type name', true),
             description: normalizeLocalizedValue(payload.description, 'Event type description'),
             symbolIcon: String(payload.symbolIcon || '').trim()
@@ -645,6 +698,11 @@ module.exports = {
         if (!eventType) return null;
         if (payload.name !== undefined) eventType.name = normalizeLocalizedValue(payload.name, 'Event type name', true);
         if (payload.description !== undefined) eventType.description = normalizeLocalizedValue(payload.description, 'Event type description');
+        if (payload.categoryId !== undefined) {
+            const categoryId = String(payload.categoryId || '').trim();
+            if (categoryId && !await MarkerCategory.exists({ categoryId })) throw new Error('Selected marker category no longer exists.');
+            eventType.categoryId = categoryId;
+        }
         if (payload.symbolIcon !== undefined) eventType.symbolIcon = String(payload.symbolIcon || '').trim();
         await eventType.save();
         if (payload.symbolIcon !== undefined) await Map.updateMany({ 'legend.eventTypeId': eventType.eventTypeId }, { $set: { 'legend.$[entry].symbolIcon': eventType.symbolIcon } }, { arrayFilters: [{ 'entry.eventTypeId': eventType.eventTypeId }] });
