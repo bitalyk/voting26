@@ -5,6 +5,7 @@ const { Schema } = mongoose;
 
 const settingsSchema = new Schema({
     votingStartTimestamp: { type: Date, default: () => new Date(Date.now() + 60 * 60 * 1000) },
+    votingStartNotificationSent: { type: Boolean, default: false },
     leaderboardShowTimestamp: { type: Date, default: () => new Date(Date.now() + 24 * 60 * 60 * 1000) },
     showSoonText: { type: Boolean, default: false },
     allowTestVoting: { type: Boolean, default: false },
@@ -50,6 +51,7 @@ const telegramUserSchema = new Schema({
     votedAt: { type: Date },
     languageCode: { type: String, default: 'en' },
     scheduleNotificationsEnabled: { type: Boolean, default: false },
+    votingStartNotificationsEnabled: { type: Boolean, default: false },
     allowedPrizes: { type: Boolean, default: false },
     wonPrizes: { type: [wonPrizeSchema], default: [] }
 }, { timestamps: true });
@@ -98,6 +100,26 @@ const scheduleEventSchema = new Schema({
     notified: { type: Boolean, default: false, index: true }
 }, { timestamps: true });
 
+const localizedTextSchema = new Schema({
+    en: { type: String, default: '' },
+    ru: { type: String, default: '' },
+    ro: { type: String, default: '' }
+}, { _id: false });
+
+const layoutPanelSchema = new Schema({
+    panelId: { type: String, required: true },
+    visible: { type: Boolean, default: true },
+    order: { type: Number, required: true },
+    title: { type: localizedTextSchema, default: () => ({}) },
+    description: { type: localizedTextSchema, default: () => ({}) }
+}, { _id: false });
+
+const siteConfigSchema = new Schema({
+    faviconPath: { type: String, default: '' },
+    mainPageLayout: { type: [layoutPanelSchema], default: [] },
+    leaderboardLayout: { type: [layoutPanelSchema], default: [] }
+}, { timestamps: true });
+
 const Settings = mongoose.model('Settings', settingsSchema);
 const Category = mongoose.model('Category', categorySchema);
 const Candidate = mongoose.model('Candidate', candidateSchema);
@@ -106,6 +128,25 @@ const TelegramUser = mongoose.model('TelegramUser', telegramUserSchema);
 const Map = mongoose.model('Map', mapSchema);
 const MapEventType = mongoose.model('MapEventType', mapEventTypeSchema);
 const ScheduleEvent = mongoose.model('ScheduleEvent', scheduleEventSchema);
+const SiteConfig = mongoose.model('SiteConfig', siteConfigSchema);
+
+const MAIN_PAGE_DEFAULTS = [
+    { panelId: 'header', visible: true, order: 0, title: { en: 'GoCon Voting Event', ru: 'Голосование GoCon', ro: 'Votarea GoCon' }, description: {} },
+    { panelId: 'schedule', visible: true, order: 1, title: { en: 'Live Schedule', ru: 'Расписание', ro: 'Program live' }, description: {} },
+    { panelId: 'voting', visible: true, order: 2, title: { en: 'GoCon Voting Event', ru: 'Голосование GoCon', ro: 'Votarea GoCon' }, description: { en: 'GoCon Voting Event - Choose your favorite projects and help shape the final results.', ru: 'Голосование GoCon - Выберите любимые проекты и помогите определить итоговые результаты.', ro: 'Votarea GoCon - Alege proiectele preferate si ajuta la stabilirea rezultatelor finale.' } },
+    { panelId: 'startVoting', visible: true, order: 3, title: { en: 'Start Voting', ru: 'Начать голосование', ro: 'Incepe votul' }, description: {} },
+    { panelId: 'leaderboard', visible: true, order: 4, title: { en: 'Leaderboard', ru: 'Лидерборд', ro: 'Clasament' }, description: {} },
+    { panelId: 'map', visible: true, order: 5, title: { en: 'Interactive Map', ru: 'Интерактивная карта', ro: 'Harta interactiva' }, description: {} },
+    { panelId: 'prizes', visible: true, order: 6, title: { en: 'Prize Wheel', ru: 'Колесо призов', ro: 'Roata premiilor' }, description: {} }
+];
+
+const LEADERBOARD_DEFAULTS = [
+    { panelId: 'header', visible: true, order: 0, title: { en: 'Leaderboard', ru: 'Лидерборд', ro: 'Clasament' }, description: { en: 'Results', ru: 'Результаты', ro: 'Rezultate' } },
+    { panelId: 'filters', visible: true, order: 1, title: { en: 'All Categories', ru: 'Все категории', ro: 'Toate categoriile' }, description: { en: 'Filter results by category.', ru: 'Фильтруйте результаты по категории.', ro: 'Filtreaza rezultatele dupa categorie.' } },
+    { panelId: 'timer', visible: true, order: 2, title: { en: 'Results are not ready yet.', ru: 'Результаты пока не готовы.', ro: 'Rezultatele nu sunt inca pregatite.' }, description: { en: 'Results are not ready yet.', ru: 'Результаты пока недоступны.', ro: 'Rezultatele nu sunt inca disponibile.' } },
+    { panelId: 'results', visible: true, order: 3, title: { en: 'Top 3', ru: 'Топ-3', ro: 'Top 3' }, description: { en: 'No votes recorded yet.', ru: 'Голосов пока нет.', ro: 'Nu sunt inca voturi inregistrate.' } },
+    { panelId: 'rankBadges', visible: true, order: 4, title: { en: 'Rank Badges', ru: 'Значки мест', ro: 'Insigne de rang' }, description: {} }
+];
 
 async function generateUniqueFiveDigitId(Model, fieldName) {
     for (let attempt = 0; attempt < 20; attempt += 1) {
@@ -239,6 +280,55 @@ function normalizeLocalizedValue(value, label, required = false) {
     return localized;
 }
 
+function cloneLayoutDefaults(defaults) {
+    return defaults.map((panel) => ({
+        panelId: panel.panelId,
+        visible: panel.visible,
+        order: panel.order,
+        title: { ...panel.title },
+        description: { ...panel.description }
+    }));
+}
+
+function normalizeLayoutPanels(panels, defaults) {
+    const suppliedPanels = Array.isArray(panels) ? panels : [];
+    const suppliedById = new Map(suppliedPanels.map((panel) => [String(panel && panel.panelId || '').trim(), panel]));
+    const localize = (value, fallback) => {
+        const source = value && typeof value === 'object' ? value : {};
+        const fallbackValue = fallback && typeof fallback === 'object' ? fallback : {};
+        const en = String(source.en ?? fallbackValue.en ?? '').trim();
+        const ru = String(source.ru ?? fallbackValue.ru ?? en).trim();
+        const ro = String(source.ro ?? fallbackValue.ro ?? en).trim();
+        return { en, ru, ro };
+    };
+    const normalized = defaults.map((defaultPanel) => {
+        const panel = suppliedById.get(defaultPanel.panelId) || {};
+        return {
+            panelId: defaultPanel.panelId,
+            visible: panel.visible === undefined ? defaultPanel.visible : Boolean(panel.visible),
+            order: Number.isFinite(Number(panel.order)) ? Number(panel.order) : defaultPanel.order,
+            title: localize(panel.title, defaultPanel.title),
+            description: localize(panel.description, defaultPanel.description)
+        };
+    });
+    normalized.sort((left, right) => left.order - right.order || left.panelId.localeCompare(right.panelId));
+    return normalized.map((panel, order) => ({ ...panel, order }));
+}
+
+async function ensureSiteConfig() {
+    let config = await SiteConfig.findOne({}).lean();
+    if (!config) {
+        const created = await SiteConfig.create({
+            faviconPath: '',
+            mainPageLayout: cloneLayoutDefaults(MAIN_PAGE_DEFAULTS),
+            leaderboardLayout: cloneLayoutDefaults(LEADERBOARD_DEFAULTS)
+        });
+        return created.toObject();
+    }
+
+    return config;
+}
+
 function normalizeScheduleEventPayload(payload = {}) {
     const startTime = toDateValue(payload.startTime);
     if (!startTime) {
@@ -303,7 +393,7 @@ async function seedDatabaseDefaults() {
             allowTestLeaderboard: String(process.env.ALLOW_TEST_LEADERBOARD || 'false').toLowerCase() === 'true'
         });
     }
-
+    await ensureSiteConfig();
 }
 
 module.exports = {
@@ -346,6 +436,9 @@ module.exports = {
 
         const votingStartTimestamp = toDateValue(payload.votingStartTimestamp);
         if (votingStartTimestamp) {
+            if (settings.votingStartTimestamp.getTime() !== votingStartTimestamp.getTime()) {
+                settings.votingStartNotificationSent = false;
+            }
             settings.votingStartTimestamp = votingStartTimestamp;
         }
 
@@ -356,6 +449,36 @@ module.exports = {
 
         await settings.save();
         return settings.toObject();
+    },
+
+    getSiteConfig: async function getSiteConfig() {
+        return ensureSiteConfig();
+    },
+
+    updateFaviconPath: async function updateFaviconPath(faviconPath) {
+        const config = await ensureSiteConfig();
+        const updatedAt = new Date();
+        const faviconPathValue = String(faviconPath || '').trim();
+        await SiteConfig.collection.updateOne({ _id: config._id }, { $set: { faviconPath: faviconPathValue, updatedAt } });
+        return { ...config, faviconPath: faviconPathValue, updatedAt };
+    },
+
+    updateMainPageLayout: async function updateMainPageLayout(panels) {
+        const config = await ensureSiteConfig();
+        if (!Array.isArray(panels)) throw new Error('Main page layout must be an array.');
+        const mainPageLayout = JSON.parse(JSON.stringify(panels));
+        const updatedAt = new Date();
+        await SiteConfig.collection.updateOne({ _id: config._id }, { $set: { mainPageLayout, updatedAt } });
+        return { ...config, mainPageLayout, updatedAt };
+    },
+
+    updateLeaderboardLayout: async function updateLeaderboardLayout(panels) {
+        const config = await ensureSiteConfig();
+        if (!Array.isArray(panels)) throw new Error('Leaderboard layout must be an array.');
+        const leaderboardLayout = JSON.parse(JSON.stringify(panels));
+        const updatedAt = new Date();
+        await SiteConfig.collection.updateOne({ _id: config._id }, { $set: { leaderboardLayout, updatedAt } });
+        return { ...config, leaderboardLayout, updatedAt };
     },
 
     getScheduleEvents: async function getScheduleEvents() {
@@ -421,6 +544,24 @@ module.exports = {
             { new: true }
         );
         return user ? user.toObject() : null;
+    },
+
+    getVotingStartNotificationUsers: async function getVotingStartNotificationUsers() {
+        return TelegramUser.find({ votingStartNotificationsEnabled: true }).select('telegramId languageCode').lean();
+    },
+
+    updateVotingStartNotifications: async function updateVotingStartNotifications(telegramId, enabled) {
+        const user = await TelegramUser.findOneAndUpdate(
+            { telegramId: String(telegramId) },
+            { $set: { votingStartNotificationsEnabled: Boolean(enabled) } },
+            { new: true }
+        );
+        return user ? user.toObject() : null;
+    },
+
+    markVotingStartNotificationSent: async function markVotingStartNotificationSent() {
+        const result = await Settings.updateOne({ votingStartNotificationSent: false }, { $set: { votingStartNotificationSent: true } });
+        return result.modifiedCount === 1;
     },
 
     getMaps: async function getMaps() {
@@ -821,14 +962,21 @@ module.exports = {
             updates.username = username;
         }
 
-        updates.languageCode = normalizedLanguage;
-
         if (Object.keys(updates).length > 0) {
             await TelegramUser.updateOne({ _id: user._id }, { $set: updates });
             user = await TelegramUser.findById(user._id);
         }
 
         return user.toObject();
+    },
+
+    updateTelegramUserLanguage: async function updateTelegramUserLanguage(telegramId, languageCode) {
+        const user = await TelegramUser.findOneAndUpdate(
+            { telegramId: String(telegramId) },
+            { $set: { languageCode: normalizeLanguageCode(languageCode) } },
+            { new: true }
+        );
+        return user ? user.toObject() : null;
     },
 
     getTelegramUserStatus: async function getTelegramUserStatus(telegramId) {

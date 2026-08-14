@@ -54,12 +54,39 @@ const upload = multer({
     }
 });
 
+const faviconUpload = multer({
+    storage,
+    limits: { fileSize: 2 * 1024 * 1024 },
+    fileFilter: (_req, file, callback) => {
+        const extension = path.extname(file.originalname).toLowerCase();
+        const allowedExtensions = ['.svg', '.png', '.ico', '.webp'];
+        if (!allowedExtensions.includes(extension)) {
+            return callback(new Error('Only SVG, PNG, ICO, and WEBP favicon files are allowed.'));
+        }
+        callback(null, true);
+    }
+});
+
 app.locals.upload = upload;
+app.locals.faviconUpload = faviconUpload;
 app.locals.adminBearerToken = adminBearerToken;
 app.locals.verifyAdminBearer = verifyAdminBearer;
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
 app.set('trust proxy', 1);
+
+app.get('/favicon.ico', async (req, res, next) => {
+    try {
+        const siteConfig = await dbHandler.getSiteConfig();
+        const filename = path.basename(String(siteConfig.faviconPath || ''));
+        const faviconFile = filename ? path.join(uploadDirectory, filename) : '';
+        if (!faviconFile || !fs.existsSync(faviconFile)) return res.status(204).end();
+        res.set('Cache-Control', 'no-store');
+        return res.sendFile(faviconFile);
+    } catch (error) {
+        return next(error);
+    }
+});
 
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(uploadDirectory));
@@ -80,7 +107,7 @@ app.use(session({
 app.use('/', routes);
 
 app.use((error, req, res, next) => {
-    if (error instanceof multer.MulterError || error.message === 'Only image uploads are allowed.') {
+    if (error instanceof multer.MulterError || ['Only image uploads are allowed.', 'Only SVG, PNG, ICO, and WEBP favicon files are allowed.'].includes(error.message)) {
         return res.status(400).render('error', { message: error.message });
     }
     return next(error);
@@ -100,6 +127,16 @@ function scheduleNotificationMessage(event, languageCode) {
         ro: `Evenimentul începe acum: ${title}!`
     };
     return `\u{1F514} ${messages[languageCode] || messages.en}`;
+}
+
+function votingStartNotificationMessage(languageCode) {
+    const messages = {
+        en: 'Voting is open now!',
+        ru: 'Голосование открыто!',
+        ro: 'Votarea este deschisa!'
+    };
+    const language = dbHandler.normalizeLanguageCode(languageCode);
+    return `\u{1F514} ${messages[language]}`;
 }
 
 async function sendTelegramScheduleNotification(telegramId, text) {
@@ -147,12 +184,33 @@ async function checkScheduleNotifications() {
     }
 }
 
+async function checkVotingStartNotifications() {
+    if (!process.env.TELEGRAM_BOT_TOKEN) return;
+    try {
+        const settings = await dbHandler.getSettings();
+        if (settings.votingStartNotificationSent || Date.now() < new Date(settings.votingStartTimestamp).getTime()) return;
+        const recipients = await dbHandler.getVotingStartNotificationUsers();
+        const deliveries = await Promise.allSettled(recipients.map((user) => sendTelegramScheduleNotification(
+            user.telegramId,
+            votingStartNotificationMessage(user.languageCode)
+        )));
+        deliveries.forEach((delivery, index) => {
+            if (delivery.status === 'rejected') console.error(`Voting start notification failed for Telegram user ${recipients[index].telegramId}:`, delivery.reason.message);
+        });
+        await dbHandler.markVotingStartNotificationSent();
+    } catch (error) {
+        console.error('Voting start notification check failed:', error.message);
+    }
+}
+
 mongoose.connect(MONGO_URI)
     .then(async () => {
         console.log('Connected to MongoDB successfully');
         await dbHandler.seedDatabaseDefaults();
         await checkScheduleNotifications();
+        await checkVotingStartNotifications();
         setInterval(checkScheduleNotifications, 60000);
+        setInterval(checkVotingStartNotifications, 60000);
         const server = app.listen(PORT, () => {
             console.log(`Server is running at http://localhost:${PORT}`);
         });

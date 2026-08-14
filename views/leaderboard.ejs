@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title><%= t.leaderboardTitle %></title>
+  <%- include('partials/header', { siteConfig }) %>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body {
@@ -13,12 +14,13 @@
   </style>
 </head>
 <body class="min-h-screen antialiased">
-  <div class="mx-auto max-w-md px-4 py-5">
-    <header class="mb-5 rounded-3xl border border-slate-700 bg-slate-900/80 p-4 shadow-2xl shadow-sky-900/10">
+  <% const panelById = Object.fromEntries(leaderboardPanels.map((panel) => [panel.panelId, panel])); const headerPanel = panelById.header; const filtersPanel = panelById.filters; const timerPanel = panelById.timer; const resultsPanel = panelById.results; const showRankBadges = Boolean(panelById.rankBadges); %>
+  <div class="mx-auto flex max-w-md flex-col gap-5 px-4 py-5">
+    <% if (headerPanel) { %><header data-layout-order="<%= headerPanel.order %>" class="rounded-3xl border border-slate-700 bg-slate-900/80 p-4 shadow-2xl shadow-sky-900/10">
       <div class="flex items-center justify-between gap-3">
         <div>
           <p class="text-[10px] font-semibold uppercase tracking-[0.2em] text-sky-400"><%= t.resultsLabel %></p>
-          <h1 class="mt-1 text-2xl font-bold text-white"><%= t.leaderboardTitle %></h1>
+          <h1 class="mt-1 text-2xl font-bold text-white"><%= headerPanel.displayTitle %></h1>
         </div>
         <div class="flex items-center gap-2">
           <select id="languageSwitcher" aria-label="<%= t.language %>" class="rounded-full border border-slate-600 bg-slate-800 px-2 py-1 text-xs font-medium text-slate-200 outline-none">
@@ -29,13 +31,15 @@
           <a href="/?lang=<%= lang %>" class="rounded-full border border-slate-600 px-3 py-1 text-xs font-medium text-slate-200"><%= t.home %></a>
         </div>
       </div>
-    </header>
+    </header><% } %>
 
-    <% if (isLocked) { %>
-      <section id="leaderboardCountdown" class="rounded-3xl border border-slate-700 bg-slate-900/80 p-5 text-center shadow-xl" data-target-time="<%= new Date(settings.leaderboardShowTimestamp).getTime() %>">
+    <% if (filtersPanel && !isLocked) { %><section id="leaderboardFilters" data-layout-order="<%= filtersPanel.order %>" class="rounded-2xl border border-slate-700 bg-slate-900/80 p-3"><p class="text-sm font-bold text-white"><%= filtersPanel.displayTitle %></p><div class="mt-3 flex flex-wrap gap-2"><button type="button" data-category-filter="all" class="rounded-full bg-sky-400 px-3 py-1.5 text-xs font-bold text-slate-950"><%= filtersPanel.displayTitle %></button><% categoryResults.forEach((category) => { %><button type="button" data-category-filter="<%= category.categoryId %>" class="rounded-full border border-slate-600 px-3 py-1.5 text-xs font-semibold text-slate-200"><%= category.categoryName %></button><% }) %></div></section><% } %>
+
+    <% if (isLocked && timerPanel) { %>
+      <section id="leaderboardCountdown" data-layout-order="<%= timerPanel.order %>" class="rounded-3xl border border-slate-700 bg-slate-900/80 p-5 text-center shadow-xl" data-target-time="<%= new Date(settings.leaderboardShowTimestamp).getTime() %>">
         <div class="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-sky-500/10 text-3xl">⏳</div>
-        <h2 class="text-xl font-bold text-white"><%= t.resultsNotReady %></h2>
-        <p class="mt-2 text-sm text-slate-300"><%= t.resultsLocked %></p>
+        <h2 class="text-xl font-bold text-white"><%= timerPanel.displayTitle %></h2>
+        <p class="mt-2 text-sm text-slate-300"><%= timerPanel.displayDescription %></p>
 
         <div class="mt-5 grid grid-cols-4 gap-2 text-center">
           <div class="rounded-xl bg-slate-800 p-2">
@@ -56,10 +60,10 @@
           </div>
         </div>
       </section>
-    <% } else { %>
-      <div class="space-y-5">
+    <% } else if (!isLocked && resultsPanel) { %>
+      <div data-layout-order="<%= resultsPanel.order %>" class="space-y-5">
         <% categoryResults.forEach((category) => { %>
-          <section class="rounded-3xl border border-slate-700 bg-slate-900/80 p-4 shadow-xl shadow-slate-950/20">
+          <section data-category-result="<%= category.categoryId %>" class="rounded-3xl border border-slate-700 bg-slate-900/80 p-4 shadow-xl shadow-slate-950/20">
             <div class="mb-3 flex items-center justify-between gap-3">
               <div class="flex items-center gap-3">
                 <% if (category.image) { %>
@@ -69,7 +73,7 @@
                 <% } %>
                 <div>
                   <p class="text-sm font-bold text-white"><%= category.categoryName %></p>
-                  <p class="text-[10px] uppercase tracking-[0.2em] text-slate-400"><%= t.topThree %></p>
+                  <p class="text-[10px] uppercase tracking-[0.2em] text-slate-400"><%= resultsPanel.displayTitle %></p>
                 </div>
               </div>
             </div>
@@ -82,9 +86,9 @@
                   <div class="rounded-2xl border border-slate-700 bg-slate-800/70 p-3">
                     <div class="flex items-center justify-between gap-3">
                       <div class="flex items-center gap-3">
-                        <div class="flex h-9 w-9 items-center justify-center rounded-full <%= index === 0 ? 'bg-amber-400 text-slate-950' : index === 1 ? 'bg-slate-300 text-slate-950' : 'bg-amber-700 text-white' %> font-black">
+                        <% if (showRankBadges) { %><div class="flex h-9 w-9 items-center justify-center rounded-full <%= index === 0 ? 'bg-amber-400 text-slate-950' : index === 1 ? 'bg-slate-300 text-slate-950' : 'bg-amber-700 text-white' %> font-black">
                           <%= candidate.rank %>
-                        </div>
+                        </div><% } %>
                         <div>
                           <p class="text-sm font-bold text-white"><%= candidate.name %></p>
                           <% if (candidate.code) { %>
@@ -106,11 +110,19 @@
 
   <script>
     const currentLanguage = '<%= lang %>';
-    document.getElementById('languageSwitcher').addEventListener('change', (event) => {
+    document.querySelectorAll('[data-layout-order]').forEach((panel) => { panel.style.order = panel.dataset.layoutOrder; });
+    document.getElementById('languageSwitcher')?.addEventListener('change', (event) => {
       localStorage.setItem('votingLang', event.target.value);
       window.location.href = `/leaderboard?lang=${encodeURIComponent(event.target.value)}`;
     });
     if (!localStorage.getItem('votingLang')) localStorage.setItem('votingLang', currentLanguage);
+    document.getElementById('leaderboardFilters')?.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-category-filter]');
+      if (!button) return;
+      const categoryId = button.dataset.categoryFilter;
+      document.querySelectorAll('[data-category-result]').forEach((section) => section.classList.toggle('hidden', categoryId !== 'all' && section.dataset.categoryResult !== categoryId));
+      document.querySelectorAll('[data-category-filter]').forEach((item) => item.className = item === button ? 'rounded-full bg-sky-400 px-3 py-1.5 text-xs font-bold text-slate-950' : 'rounded-full border border-slate-600 px-3 py-1.5 text-xs font-semibold text-slate-200');
+    });
     const leaderboardCountdown = document.getElementById('leaderboardCountdown');
     if (leaderboardCountdown) {
       const updateLeaderboardCountdown = () => {
