@@ -23,7 +23,7 @@
             <div><h2 class="font-bold text-white"><%= category.name.en || category.name.ru || category.name.ro || 'Untitled category' %></h2><p class="mt-1 text-xs text-slate-400">ID: <%= category.categoryId %> | Order: <%= category.order %></p></div>
           </div>
           <div class="flex flex-wrap gap-2">
-            <button type="button" class="edit-category rounded-lg border border-slate-500 px-3 py-2 text-sm font-semibold" data-id="<%= category.categoryId %>" data-name-en="<%= category.name.en || '' %>" data-name-ru="<%= category.name.ru || '' %>" data-name-ro="<%= category.name.ro || '' %>" data-order="<%= category.order %>">Edit</button>
+            <button type="button" class="edit-category rounded-lg border border-slate-500 px-3 py-2 text-sm font-semibold" data-id="<%= category.categoryId %>" data-name-en="<%= category.name.en || '' %>" data-name-ru="<%= category.name.ru || '' %>" data-name-ro="<%= category.name.ro || '' %>" data-description-en="<%= category.description?.en || '' %>" data-description-ru="<%= category.description?.ru || '' %>" data-description-ro="<%= category.description?.ro || '' %>" data-requires-video-url="<%= category.requiresVideoUrl ? 'true' : 'false' %>" data-order="<%= category.order %>">Edit</button>
             <a href="/admin/categories/<%= encodeURIComponent(category.categoryId) %>/candidates" class="rounded-lg bg-sky-400 px-3 py-2 text-sm font-bold text-slate-950">Manage Candidates</a>
             <form method="POST" action="/admin/categories/<%= encodeURIComponent(category.categoryId) %>/delete" onsubmit="return confirm('Delete this category and all of its candidates?');"><button class="rounded-lg border border-red-500/50 px-3 py-2 text-sm font-semibold text-red-200">Delete</button></form>
           </div>
@@ -36,10 +36,14 @@
     <form method="POST" action="/admin/categories" enctype="multipart/form-data" class="w-full max-w-lg rounded-xl border border-slate-700 bg-slate-900 p-5 shadow-2xl">
       <div class="flex items-center justify-between"><h2 class="text-xl font-bold text-white">Add category</h2><button type="button" data-close-modal="createModal" class="text-slate-300">Close</button></div>
       <div class="mt-5 grid gap-3">
-        <label class="text-sm">Category image<input type="file" name="image" accept="image/*" class="mt-1 block w-full text-sm" /></label>
+        <label class="text-sm">Category image<input type="file" name="image" accept=".jpg,.jpeg,.png,.gif,.webp,.svg" class="mt-1 block w-full text-sm" /></label>
         <label class="text-sm">Name (English)<input name="nameEn" required class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white" /></label>
         <label class="text-sm">Name (Russian)<input name="nameRu" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white" /></label>
         <label class="text-sm">Name (Romanian)<input name="nameRo" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white" /></label>
+        <label class="text-sm">Description (English)<textarea name="descriptionEn" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white"></textarea></label>
+        <label class="text-sm">Description (Russian)<textarea name="descriptionRu" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white"></textarea></label>
+        <label class="text-sm">Description (Romanian)<textarea name="descriptionRo" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white"></textarea></label>
+        <label class="flex items-center gap-2 text-sm"><input name="requiresVideoUrl" type="checkbox" /> Require Video URL for Participants</label>
         <label class="text-sm">Order position (optional)<input name="order" type="number" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white" /></label>
         <button class="mt-2 rounded-lg bg-emerald-400 px-4 py-2.5 font-bold text-slate-950">Create category</button>
       </div>
@@ -51,10 +55,14 @@
       <div class="flex items-center justify-between"><h2 class="text-xl font-bold text-white">Edit category</h2><button type="button" data-close-modal="editModal" class="text-slate-300">Close</button></div>
       <p id="editCategoryId" class="mt-2 text-sm text-slate-400"></p>
       <div class="mt-5 grid gap-3">
-        <label class="text-sm">Replace category image<input type="file" name="image" accept="image/*" class="mt-1 block w-full text-sm" /></label>
+        <label class="text-sm">Replace category image<input type="file" name="image" accept=".jpg,.jpeg,.png,.gif,.webp,.svg" class="mt-1 block w-full text-sm" /></label>
         <label class="text-sm">Name (English)<input id="editNameEn" name="nameEn" required class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white" /></label>
         <label class="text-sm">Name (Russian)<input id="editNameRu" name="nameRu" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white" /></label>
         <label class="text-sm">Name (Romanian)<input id="editNameRo" name="nameRo" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white" /></label>
+        <label class="text-sm">Description (English)<textarea id="editDescriptionEn" name="descriptionEn" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white"></textarea></label>
+        <label class="text-sm">Description (Russian)<textarea id="editDescriptionRu" name="descriptionRu" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white"></textarea></label>
+        <label class="text-sm">Description (Romanian)<textarea id="editDescriptionRo" name="descriptionRo" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white"></textarea></label>
+        <label class="flex items-center gap-2 text-sm"><input id="editRequiresVideoUrl" name="requiresVideoUrl" type="checkbox" /> Require Video URL for Participants</label>
         <label class="text-sm">Order position<input id="editOrder" name="order" type="number" required class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white" /></label>
         <button class="mt-2 rounded-lg bg-emerald-400 px-4 py-2.5 font-bold text-slate-950">Save category</button>
       </div>
@@ -68,7 +76,9 @@
     const submitAdminForm = async (form) => {
       if (!adminToken()) { window.location.href = '/admin/login'; return; }
       const response = await fetch(form.action, { method: form.method || 'POST', headers: { Authorization: `Bearer ${adminToken()}` }, body: new FormData(form) });
-      const result = await response.json();
+      const result = await response.json().catch(() => ({}));
+      if (response.status === 413 || result.code === 'FILE_TOO_LARGE') throw new Error(<%- JSON.stringify(t.fileTooLarge) %>);
+      if (response.status === 415 || result.code === 'UNSUPPORTED_IMAGE_FORMAT') throw new Error(<%- JSON.stringify(t.unsupportedFileFormat) %>);
       if (!response.ok || !result.success) throw new Error(result.error || 'Request failed.');
       window.location.href = result.redirect || '/admin/categories';
     };
@@ -80,6 +90,10 @@
       document.getElementById('editNameEn').value = button.dataset.nameEn;
       document.getElementById('editNameRu').value = button.dataset.nameRu;
       document.getElementById('editNameRo').value = button.dataset.nameRo;
+      document.getElementById('editDescriptionEn').value = button.dataset.descriptionEn;
+      document.getElementById('editDescriptionRu').value = button.dataset.descriptionRu;
+      document.getElementById('editDescriptionRo').value = button.dataset.descriptionRo;
+      document.getElementById('editRequiresVideoUrl').checked = button.dataset.requiresVideoUrl === 'true';
       document.getElementById('editOrder').value = button.dataset.order;
       showModal('editModal');
     });

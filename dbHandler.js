@@ -15,7 +15,9 @@ const settingsSchema = new Schema({
 const categorySchema = new Schema({
     categoryId: { type: String, required: true, unique: true, index: true },
     name: { type: Schema.Types.Mixed, default: {} },
+    description: { type: Schema.Types.Mixed, default: {} },
     image: { type: String, default: '' },
+    requiresVideoUrl: { type: Boolean, default: false },
     order: { type: Number, default: () => Date.now() }
 }, { timestamps: true });
 
@@ -26,6 +28,7 @@ const candidateSchema = new Schema({
     description: { type: String, default: '' },
     code: { type: String, default: '' },
     image: { type: String, default: '' },
+    videoUrl: { type: String, default: '' },
     order: { type: Number, default: () => Date.now() },
     votes: { type: Number, default: 0 }
 }, { timestamps: true });
@@ -48,6 +51,7 @@ const telegramUserSchema = new Schema({
     telegramId: { type: String, required: true, unique: true, index: true },
     username: { type: String, default: '' },
     voted: { type: Boolean, default: false },
+    votedCategories: { type: [String], default: [] },
     votedAt: { type: Date },
     languageCode: { type: String, default: 'en' },
     scheduleNotificationsEnabled: { type: Boolean, default: false },
@@ -726,11 +730,13 @@ module.exports = {
         return Category.findOne({ categoryId }).lean();
     },
 
-    createCategory: async function createCategory({ name, image, order }) {
+    createCategory: async function createCategory({ name, description, image, requiresVideoUrl, order }) {
         const doc = await Category.create({
             categoryId: await generateUniqueFiveDigitId(Category, 'categoryId'),
             name: name || {},
+            description: description || {},
             image: image || '',
+            requiresVideoUrl: Boolean(requiresVideoUrl),
             order: order === undefined || order === '' ? Date.now() : Number(order)
         });
         return doc.toObject();
@@ -746,8 +752,16 @@ module.exports = {
             category.name = payload.name;
         }
 
+        if (payload.description !== undefined) {
+            category.description = payload.description || {};
+        }
+
         if (payload.image !== undefined) {
             category.image = payload.image || '';
+        }
+
+        if (payload.requiresVideoUrl !== undefined) {
+            category.requiresVideoUrl = Boolean(payload.requiresVideoUrl);
         }
 
         if (payload.order !== undefined && payload.order !== null) {
@@ -798,6 +812,7 @@ module.exports = {
             description: payload.description || '',
             code: payload.code || '',
             image: payload.image || '',
+            videoUrl: String(payload.videoUrl || '').trim(),
             order: payload.order === undefined || payload.order === '' ? Date.now() : Number(payload.order),
             votes: 0
         });
@@ -847,6 +862,10 @@ module.exports = {
 
         if (payload.image) {
             candidate.image = payload.image;
+        }
+
+        if (payload.videoUrl !== undefined) {
+            candidate.videoUrl = String(payload.videoUrl || '').trim();
         }
 
         if (payload.order !== undefined && payload.order !== null) {
@@ -1088,57 +1107,52 @@ module.exports = {
             return { success: false, error: 'Voting is not open yet.' };
         }
 
-        const categories = await Category.find({}).select('categoryId').lean();
-        const expectedSelectionCount = categories.length;
-
-        if (expectedSelectionCount === 0) {
-            return { success: false, error: 'No voting categories are configured yet.' };
-        }
-
-        const categoryIds = new Set(categories.map((category) => category.categoryId));
         const selectedPairs = Object.entries(categoryVotes || {})
             .filter(([categoryId, candidateId]) => categoryId && candidateId)
-            .map(([categoryId, candidateId]) => ({ categoryId, candidateId }));
+            .map(([categoryId, candidateId]) => ({ categoryId: String(categoryId), candidateId: String(candidateId) }));
 
-        if (selectedPairs.length !== expectedSelectionCount) {
-            return { success: false, error: `Please select one candidate in each of the ${expectedSelectionCount} categories before submitting.` };
+        if (selectedPairs.length !== 1) {
+            return { success: false, error: 'Please select one candidate before submitting.' };
         }
 
-        const uniqueCategoryIds = new Set(selectedPairs.map((pair) => pair.categoryId));
-        if (uniqueCategoryIds.size !== expectedSelectionCount || [...uniqueCategoryIds].some((categoryId) => !categoryIds.has(categoryId))) {
-            return { success: false, error: `Please select one candidate in each of the ${expectedSelectionCount} categories before submitting.` };
+        const [{ categoryId, candidateId }] = selectedPairs;
+        const category = await Category.findOne({ categoryId }).select('categoryId').lean();
+        if (!category) {
+            return { success: false, error: 'The selected category is invalid.' };
         }
 
-        const existingCandidates = await Candidate.find({
-            $or: selectedPairs.map(({ categoryId, candidateId }) => ({ categoryId, candidateId }))
-        }).lean();
+        const candidate = await Candidate.findOne({ categoryId, candidateId }).select('_id').lean();
+        if (!candidate) {
+            return { success: false, error: 'The selected candidate is invalid.' };
+        }
 
-        if (existingCandidates.length !== selectedPairs.length) {
-            return { success: false, error: 'One or more selected candidates are invalid.' };
+        const allCategories = await Category.find({}).select('categoryId').lean();
+        if (allCategories.length === 0) {
+            return { success: false, error: 'No voting categories are configured yet.' };
         }
 
         const votedAt = new Date();
         const claimedUser = await TelegramUser.findOneAndUpdate(
-            { telegramId: normalizedId, voted: false },
-            { $set: { voted: true, votedAt } },
+            { telegramId: normalizedId, voted: false, votedCategories: { $ne: categoryId } },
+            { $addToSet: { votedCategories: categoryId }, $set: { votedAt } },
             { new: true }
         );
 
         if (!claimedUser) {
-            return { success: false, error: 'This Telegram account has already voted.' };
+            return { success: false, error: 'This Telegram account has already voted in this category.' };
         }
 
         try {
-            await Candidate.bulkWrite(selectedPairs.map(({ categoryId, candidateId }) => ({
-                updateOne: {
-                    filter: { categoryId, candidateId },
-                    update: { $inc: { votes: 1 } }
-                }
-            })));
+            await Candidate.updateOne({ categoryId, candidateId }, { $inc: { votes: 1 } });
+            const hasVotedEveryCategory = allCategories.every((entry) => claimedUser.votedCategories.includes(entry.categoryId));
+            if (hasVotedEveryCategory) {
+                claimedUser.voted = true;
+                await claimedUser.save();
+            }
         } catch (error) {
             await TelegramUser.updateOne(
                 { _id: claimedUser._id, votedAt },
-                { $set: { voted: false }, $unset: { votedAt: 1 } }
+                { $pull: { votedCategories: categoryId }, $unset: { votedAt: 1 } }
             );
             throw error;
         }

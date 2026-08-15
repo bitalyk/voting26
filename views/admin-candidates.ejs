@@ -23,7 +23,7 @@
             <div><h2 class="font-bold text-white"><%= candidate.name %></h2><p class="mt-1 text-xs text-slate-400">ID: <%= candidate.candidateId %><% if (candidate.code) { %> | <%= candidate.code %><% } %></p><p class="mt-1 text-sm text-slate-300"><%= candidate.description %></p></div>
           </div>
           <div class="flex flex-wrap items-center gap-2">
-            <button type="button" class="edit-candidate rounded-lg border border-slate-500 px-3 py-2 text-sm font-semibold" data-id="<%= candidate.candidateId %>" data-name="<%= candidate.name %>" data-description="<%= candidate.description || '' %>" data-code="<%= candidate.code || '' %>" data-order="<%= candidate.order %>">Edit</button>
+            <button type="button" class="edit-candidate rounded-lg border border-slate-500 px-3 py-2 text-sm font-semibold" data-id="<%= candidate.candidateId %>" data-name="<%= candidate.name %>" data-description="<%= candidate.description || '' %>" data-code="<%= candidate.code || '' %>" data-video-url="<%= candidate.videoUrl || '' %>" data-order="<%= candidate.order %>">Edit</button>
             <form method="POST" action="/admin/categories/<%= encodeURIComponent(category.categoryId) %>/candidates/<%= encodeURIComponent(candidate.candidateId) %>/order" class="flex gap-1"><input type="number" name="order" value="<%= candidate.order %>" aria-label="Candidate order" class="w-20 rounded-lg border border-slate-600 bg-slate-800 px-2 py-2 text-sm text-white" /><button class="rounded-lg border border-slate-500 px-2 py-2 text-sm">Save order</button></form>
             <form method="POST" action="/admin/categories/<%= encodeURIComponent(category.categoryId) %>/candidates/<%= encodeURIComponent(candidate.candidateId) %>/delete" onsubmit="return confirm('Delete this candidate?');"><button class="rounded-lg border border-red-500/50 px-3 py-2 text-sm font-semibold text-red-200">Delete</button></form>
           </div>
@@ -36,10 +36,11 @@
     <form method="POST" action="/admin/categories/<%= encodeURIComponent(category.categoryId) %>/candidates" enctype="multipart/form-data" class="w-full max-w-lg rounded-xl border border-slate-700 bg-slate-900 p-5 shadow-2xl">
       <div class="flex items-center justify-between"><h2 class="text-xl font-bold text-white">Add candidate</h2><button type="button" data-close-modal="createModal" class="text-slate-300">Close</button></div>
       <div class="mt-5 grid gap-3">
-        <label class="text-sm">Candidate photo<input type="file" name="image" accept="image/*" class="mt-1 block w-full text-sm" /></label>
+        <label class="text-sm">Candidate photo<input type="file" name="image" accept=".jpg,.jpeg,.png,.gif,.webp,.svg" class="mt-1 block w-full text-sm" /></label>
         <label class="text-sm">Candidate name<input name="name" required class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white" /></label>
         <label class="text-sm">Description<textarea name="description" rows="3" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white"></textarea></label>
         <label class="text-sm">Candidate code<input name="code" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white" /></label>
+        <% if (category.requiresVideoUrl) { %><label class="text-sm">Participant Video URL<input name="videoUrl" type="url" required placeholder="https://..." class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white" /></label><% } %>
         <label class="text-sm">Order position (optional)<input name="order" type="number" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white" /></label>
         <button class="mt-2 rounded-lg bg-emerald-400 px-4 py-2.5 font-bold text-slate-950">Create candidate</button>
       </div>
@@ -51,10 +52,11 @@
       <div class="flex items-center justify-between"><h2 class="text-xl font-bold text-white">Edit candidate</h2><button type="button" data-close-modal="editModal" class="text-slate-300">Close</button></div>
       <p id="editCandidateId" class="mt-2 text-sm text-slate-400"></p>
       <div class="mt-5 grid gap-3">
-        <label class="text-sm">Replace candidate photo<input type="file" name="image" accept="image/*" class="mt-1 block w-full text-sm" /></label>
+        <label class="text-sm">Replace candidate photo<input type="file" name="image" accept=".jpg,.jpeg,.png,.gif,.webp,.svg" class="mt-1 block w-full text-sm" /></label>
         <label class="text-sm">Candidate name<input id="editName" name="name" required class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white" /></label>
         <label class="text-sm">Description<textarea id="editDescription" name="description" rows="3" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white"></textarea></label>
         <label class="text-sm">Candidate code<input id="editCode" name="code" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white" /></label>
+        <% if (category.requiresVideoUrl) { %><label class="text-sm">Participant Video URL<input id="editVideoUrl" name="videoUrl" type="url" required placeholder="https://..." class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white" /></label><% } %>
         <label class="text-sm">Order position<input id="editOrder" name="order" type="number" required class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white" /></label>
         <button class="mt-2 rounded-lg bg-emerald-400 px-4 py-2.5 font-bold text-slate-950">Save candidate</button>
       </div>
@@ -69,7 +71,9 @@
     const submitAdminForm = async (form) => {
       if (!adminToken()) { window.location.href = '/admin/login'; return; }
       const response = await fetch(form.action, { method: form.method || 'POST', headers: { Authorization: `Bearer ${adminToken()}` }, body: new FormData(form) });
-      const result = await response.json();
+      const result = await response.json().catch(() => ({}));
+      if (response.status === 413 || result.code === 'FILE_TOO_LARGE') throw new Error(<%- JSON.stringify(t.fileTooLarge) %>);
+      if (response.status === 415 || result.code === 'UNSUPPORTED_IMAGE_FORMAT') throw new Error(<%- JSON.stringify(t.unsupportedFileFormat) %>);
       if (!response.ok || !result.success) throw new Error(result.error || 'Request failed.');
       window.location.href = result.redirect || `/admin/categories/${encodeURIComponent(categoryId)}/candidates`;
     };
@@ -81,6 +85,7 @@
       document.getElementById('editName').value = button.dataset.name;
       document.getElementById('editDescription').value = button.dataset.description;
       document.getElementById('editCode').value = button.dataset.code;
+      const editVideoUrl = document.getElementById('editVideoUrl'); if (editVideoUrl) editVideoUrl.value = button.dataset.videoUrl;
       document.getElementById('editOrder').value = button.dataset.order;
       showModal('editModal');
     });

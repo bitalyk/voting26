@@ -42,29 +42,29 @@ const storage = multer.diskStorage({
     }
 });
 
+const allowedImageExtensions = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg']);
+const allowedImageMimeTypes = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml']);
+
+function imageFileFilter(_req, file, callback) {
+    const extension = path.extname(file.originalname).toLowerCase();
+    if (!allowedImageExtensions.has(extension) || !allowedImageMimeTypes.has(file.mimetype)) {
+        const error = new Error('Unsupported image format.');
+        error.code = 'UNSUPPORTED_IMAGE_FORMAT';
+        return callback(error);
+    }
+    return callback(null, true);
+}
+
 const upload = multer({
     storage,
     limits: { fileSize: 5 * 1024 * 1024 },
-    fileFilter: (_req, file, callback) => {
-        const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-        if (!allowedTypes.includes(file.mimetype)) {
-            return callback(new Error('Only image uploads are allowed.'));
-        }
-        callback(null, true);
-    }
+    fileFilter: imageFileFilter
 });
 
 const faviconUpload = multer({
     storage,
-    limits: { fileSize: 2 * 1024 * 1024 },
-    fileFilter: (_req, file, callback) => {
-        const extension = path.extname(file.originalname).toLowerCase();
-        const allowedExtensions = ['.svg', '.png', '.ico', '.webp'];
-        if (!allowedExtensions.includes(extension)) {
-            return callback(new Error('Only SVG, PNG, ICO, and WEBP favicon files are allowed.'));
-        }
-        callback(null, true);
-    }
+    limits: { fileSize: 5 * 1024 * 1024 },
+    fileFilter: imageFileFilter
 });
 
 app.locals.upload = upload;
@@ -107,8 +107,14 @@ app.use(session({
 app.use('/', routes);
 
 app.use((error, req, res, next) => {
-    if (error instanceof multer.MulterError || ['Only image uploads are allowed.', 'Only SVG, PNG, ICO, and WEBP favicon files are allowed.'].includes(error.message)) {
-        return res.status(400).render('error', { message: error.message });
+    if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {
+        return res.status(413).json({ success: false, code: 'FILE_TOO_LARGE', error: 'File is too large! Please upload an image smaller than 5MB.' });
+    }
+    if (error && error.code === 'UNSUPPORTED_IMAGE_FORMAT') {
+        return res.status(415).json({ success: false, code: 'UNSUPPORTED_IMAGE_FORMAT', error: 'Unsupported image format! Please use PNG, JPG, WEBP, or SVG.' });
+    }
+    if (error instanceof multer.MulterError) {
+        return res.status(400).json({ success: false, error: error.message });
     }
     return next(error);
 });

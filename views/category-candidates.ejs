@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="<%= lang %>">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title><%= category.displayName %></title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>body { background: linear-gradient(180deg, #020617 0%, #111827 100%); color: #e2e8f0; }.candidate-card.selected { border-color: #38bdf8; background: rgba(14, 116, 144, .2); }</style>
+</head>
+<body class="min-h-screen antialiased">
+  <main class="mx-auto max-w-md px-4 py-5">
+    <header class="mb-5 rounded-2xl border border-slate-700 bg-slate-900/80 p-4 shadow-xl"><a href="/vote?lang=<%= lang %>" class="text-sm text-sky-300"><%= t.selectCategory %></a><h1 class="mt-2 text-2xl font-bold text-white"><%= category.displayName %></h1><% if (category.displayDescription) { %><p class="mt-1 text-sm text-slate-300"><%= category.displayDescription %></p><% } %></header>
+    <% if (hasVoted) { %>
+      <p class="rounded-2xl border border-emerald-400/40 bg-emerald-400/10 p-5 text-center font-semibold text-emerald-200"><%= t.voted %></p>
+    <% } else if (!candidates.length) { %>
+      <p class="rounded-2xl border border-dashed border-slate-600 p-5 text-center text-slate-300"><%= t.noVotes %></p>
+    <% } else { %>
+      <form id="voteForm" class="space-y-3">
+        <% candidates.forEach((candidate) => { %>
+          <label class="candidate-card flex cursor-pointer items-center gap-3 rounded-2xl border border-slate-700 bg-slate-900/80 p-3 shadow-lg"><input type="radio" name="candidate" value="<%= candidate.candidateId %>" class="h-4 w-4 accent-sky-500" data-name="<%= candidate.name %>" data-code="<%= candidate.code || '' %>" data-image="<%= candidate.image || '' %>" /><% if (candidate.image) { %><img src="<%= candidate.image %>" alt="" class="h-14 w-14 rounded-xl object-cover" /><% } else { %><div class="flex h-14 w-14 items-center justify-center rounded-xl bg-slate-700 font-bold"><%= candidate.code || candidate.name.charAt(0) %></div><% } %><div class="min-w-0 flex-1"><strong class="block text-sm text-white"><%= candidate.name %></strong><span class="text-xs text-sky-300"><%= candidate.code %></span><p class="mt-1 text-xs text-slate-300"><%= candidate.description || t.noDescription %></p></div><% if (candidate.videoUrl) { %><a href="<%= candidate.videoUrl %>" target="_blank" rel="noopener noreferrer" class="shrink-0 rounded-lg border border-sky-400 px-2 py-1 text-xs font-bold text-sky-200"><%= t.watchVideo %></a><% } %></label>
+        <% }) %>
+        <button id="submitButton" type="submit" disabled class="w-full rounded-xl bg-sky-400 px-4 py-3 font-bold text-slate-950 disabled:opacity-40"><%= t.submitVote %></button>
+      </form>
+    <% } %>
+  </main>
+  <div id="reviewModal" class="fixed inset-0 z-20 hidden items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm" role="dialog" aria-modal="true"><section class="w-full max-w-md rounded-2xl border border-sky-400/40 bg-slate-900 p-5 shadow-2xl"><h2 class="text-2xl font-black text-white"><%= t.youVoted %></h2><div id="reviewSummary" class="mt-4"></div><div class="mt-5 grid grid-cols-2 gap-3"><button id="discardButton" type="button" class="rounded-xl border border-slate-600 px-3 py-3 font-bold"><%= t.discard %></button><button id="confirmButton" type="button" class="rounded-xl bg-emerald-400 px-3 py-3 font-bold text-slate-950"><%= t.confirmVote %></button></div></section></div>
+  <script>
+    const tg = window.Telegram?.WebApp;
+    const form = document.getElementById('voteForm');
+    const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
+    document.querySelectorAll('input[name="candidate"]').forEach((input) => input.addEventListener('change', () => { document.querySelectorAll('.candidate-card').forEach((card) => card.classList.toggle('selected', card.contains(input) && input.checked)); document.getElementById('submitButton').disabled = false; }));
+    form?.addEventListener('submit', (event) => { event.preventDefault(); const selected = document.querySelector('input[name="candidate"]:checked'); if (!selected) return; document.getElementById('reviewSummary').innerHTML = `<article class="flex items-center gap-3 rounded-xl bg-slate-800 p-3">${selected.dataset.image ? `<img src="${escapeHtml(selected.dataset.image)}" class="h-12 w-12 rounded-lg object-cover" alt="" />` : ''}<div><p class="font-bold text-white">${escapeHtml(selected.dataset.name)}</p><p class="text-xs text-sky-300">${escapeHtml(selected.dataset.code)}</p></div></article>`; document.getElementById('reviewModal').classList.replace('hidden', 'flex'); });
+    document.getElementById('discardButton').addEventListener('click', () => document.getElementById('reviewModal').classList.replace('flex', 'hidden'));
+    document.getElementById('confirmButton').addEventListener('click', async () => { const selected = document.querySelector('input[name="candidate"]:checked'); if (!tg?.initData) return window.alert(<%- JSON.stringify(t.telegramOnly) %>); const response = await fetch('/api/telegram-vote', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ initData: tg.initData, categoryVotes: { '<%= category.categoryId %>': selected.value } }) }); const result = await response.json(); if (!response.ok || !result.success) return window.alert(result.error || <%- JSON.stringify(t.voteFailed) %>); window.location.href = `/vote?lang=<%= lang %>`; });
+    if (tg) { tg.ready(); tg.expand(); }
+  </script>
+</body>
+</html>

@@ -15,6 +15,9 @@ const I18N = {
 
 I18N.ru.notifyWhenVotingStarts = 'Уведомить о начале голосования';
 I18N.ro.notifyWhenVotingStarts = 'Anunță-mă când începe votarea';
+Object.assign(I18N.en, { vote: 'Vote', voted: 'Voted', selectCategory: 'Select Category', watchVideo: 'Watch Video', videoUnavailable: 'Video Unavailable', fileTooLarge: 'File size too large (Max 5MB)', unsupportedFileFormat: 'Unsupported file format' });
+Object.assign(I18N.ru, { vote: 'Голосовать', voted: 'Проголосовано', selectCategory: 'Выберите категорию', watchVideo: 'Смотреть видео', videoUnavailable: 'Видео недоступно', fileTooLarge: 'Размер файла слишком большой (макс. 5 МБ)', unsupportedFileFormat: 'Неподдерживаемый формат файла' });
+Object.assign(I18N.ro, { vote: 'Votează', voted: 'Votat', selectCategory: 'Selectează categoria', watchVideo: 'Vezi video', videoUnavailable: 'Videoclip indisponibil', fileTooLarge: 'Fișierul este prea mare (max. 5 MB)', unsupportedFileFormat: 'Format de fișier neacceptat' });
 
 function readCookie(req, name) {
     const entry = String(req.headers.cookie || '').split(';').find((cookie) => cookie.trim().startsWith(`${name}=`));
@@ -64,6 +67,18 @@ const uploadFavicon = (req, res, next) => req.app.locals.faviconUpload.single('f
 const imagePath = (req) => (req.file ? `/uploads/${req.file.filename}` : '');
 const categoryPath = (categoryId) => `/admin/categories/${encodeURIComponent(categoryId)}/candidates`;
 
+function participantVideoUrl(value) {
+    const url = String(value || '').trim();
+    if (!url) return '';
+    try {
+        const parsed = new URL(url);
+        if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') throw new Error('Invalid protocol');
+        return parsed.toString();
+    } catch {
+        throw new Error('Participant video URL must be a valid HTTP or HTTPS URL.');
+    }
+}
+
 function visibleLocalizedPanels(layout, lang) {
     return (layout || []).filter((panel) => panel.visible).sort((left, right) => left.order - right.order).map((panel) => ({
         ...panel,
@@ -101,10 +116,24 @@ router.get('/map', asyncRoute(async (req, res) => {
 router.get('/vote', asyncRoute(async (req, res) => {
     const settings = await dbHandler.getSettings();
     if (!settings.allowTestVoting && Date.now() < new Date(settings.votingStartTimestamp).getTime()) return res.status(403).render('error', { ...getPageContext(req), message: getPageContext(req).t.votingNotStarted });
-    const [categories, candidates] = await Promise.all([dbHandler.getCategories(), dbHandler.getCandidates()]);
-    const byCategory = new Map(); candidates.forEach((candidate) => byCategory.set(candidate.categoryId, [...(byCategory.get(candidate.categoryId) || []), candidate]));
+    const categories = await dbHandler.getCategories();
+    const telegramId = req.session && req.session.telegramUserId;
+    const status = telegramId ? await dbHandler.getTelegramUserStatus(telegramId) : null;
+    const votedCategories = new Set(status && status.valid ? status.data.votedCategories || [] : []);
+    const legacyVoter = Boolean(status && status.valid && status.data.voted);
     const { lang } = getPageContext(req);
-    renderPublic(req, res, 'vote', { categories: categories.map((category) => ({ ...category, displayName: dbHandler.resolveLocalizedText(category.name, lang), candidates: byCategory.get(category.categoryId) || [] })) });
+    renderPublic(req, res, 'vote', { categories: categories.map((category) => ({ ...category, displayName: dbHandler.resolveLocalizedText(category.name, lang), displayDescription: dbHandler.resolveLocalizedText(category.description, lang), hasVoted: legacyVoter || votedCategories.has(category.categoryId) })) });
+}));
+router.get('/vote/category/:categoryId', asyncRoute(async (req, res) => {
+    const settings = await dbHandler.getSettings();
+    if (!settings.allowTestVoting && Date.now() < new Date(settings.votingStartTimestamp).getTime()) return res.status(403).render('error', { ...getPageContext(req), message: getPageContext(req).t.votingNotStarted });
+    const category = await dbHandler.getCategoryById(req.params.categoryId);
+    if (!category) return res.status(404).render('error', { ...getPageContext(req), message: 'Category not found.' });
+    const telegramId = req.session && req.session.telegramUserId;
+    const status = telegramId ? await dbHandler.getTelegramUserStatus(telegramId) : null;
+    const hasVoted = Boolean(status && status.valid && (status.data.voted || (status.data.votedCategories || []).includes(category.categoryId)));
+    const { lang } = getPageContext(req);
+    return renderPublic(req, res, 'category-candidates', { category: { ...category, displayName: dbHandler.resolveLocalizedText(category.name, lang), displayDescription: dbHandler.resolveLocalizedText(category.description, lang) }, candidates: await dbHandler.getCandidatesByCategory(category.categoryId), hasVoted });
 }));
 router.get('/leaderboard', asyncRoute(async (req, res) => {
     const [settings, leaderboard, siteConfig] = await Promise.all([dbHandler.getSettings(), dbHandler.getLeaderboard(), dbHandler.getSiteConfig()]);
@@ -122,7 +151,7 @@ router.get('/api/schedule', asyncRoute(async (_req, res) => res.json({ success: 
 router.post('/api/telegram-auth', asyncRoute(async (req, res) => {
     const verification = verifyTelegramInitData(req.body && req.body.initData); if (!verification.valid) return res.status(401).json({ success: false, error: verification.error });
     const user = await dbHandler.getOrCreateTelegramUser(verification.user.id, verification.user.username || verification.user.first_name, verification.user.language_code); req.session.telegramUserId = user.telegramId;
-    return res.json({ success: true, voted: Boolean(user.voted), allowedPrizes: Boolean(user.allowedPrizes), scheduleNotificationsEnabled: Boolean(user.scheduleNotificationsEnabled), votingStartNotificationsEnabled: Boolean(user.votingStartNotificationsEnabled), user: { id: user.telegramId, username: user.username, languageCode: user.languageCode } });
+    return res.json({ success: true, voted: Boolean(user.voted), votedCategories: user.votedCategories || [], allowedPrizes: Boolean(user.allowedPrizes), scheduleNotificationsEnabled: Boolean(user.scheduleNotificationsEnabled), votingStartNotificationsEnabled: Boolean(user.votingStartNotificationsEnabled), user: { id: user.telegramId, username: user.username, languageCode: user.languageCode } });
 }));
 router.post('/api/user/language', asyncRoute(async (req, res) => {
     const verification = verifyTelegramInitData(req.body && req.body.initData);
@@ -154,7 +183,7 @@ router.post('/admin/logout', adminMutationGuard, (req, res) => req.session.destr
 router.get('/admin', adminGuard, asyncRoute(async (req, res) => res.render('admin-settings', { ...getPageContext(req), isLoggedIn: true, settings: await dbHandler.getSettings(), errorMessage: '' })));
 router.post('/admin/settings', adminMutationGuard, asyncRoute(async (req, res) => { await dbHandler.updateSettings({ votingStartTimestamp: req.body.votingStartTimestamp, leaderboardShowTimestamp: req.body.leaderboardShowTimestamp, showSoonText: req.body.showSoonText === 'on', allowTestVoting: req.body.allowTestVoting === 'on', allowTestLeaderboard: req.body.allowTestLeaderboard === 'on' }); res.json({ success: true, redirect: '/admin' }); }));
 
-router.get('/admin/graphics', adminGuard, asyncRoute(async (req, res) => res.render('admin-graphics', { siteConfig: await dbHandler.getSiteConfig() })));
+router.get('/admin/graphics', adminGuard, asyncRoute(async (req, res) => res.render('admin-graphics', { ...getPageContext(req), siteConfig: await dbHandler.getSiteConfig() })));
 router.post('/admin/graphics/favicon', adminMutationGuard, uploadFavicon, asyncRoute(async (req, res) => {
     if (!req.file) return res.status(400).json({ success: false, error: 'Choose a favicon file to upload.' });
     await dbHandler.updateFaviconPath(`/uploads/${req.file.filename}`);
@@ -221,12 +250,12 @@ router.get('/api/admin/users/count', adminMutationGuard, asyncRoute(async (_req,
 router.get('/api/admin/users/search', adminMutationGuard, asyncRoute(async (req, res) => res.json({ success: true, users: await dbHandler.searchTelegramUsers(req.query.q) })));
 router.post('/api/admin/users/:telegramId/prize-permission', adminMutationGuard, asyncRoute(async (req, res) => { const user = await dbHandler.updateTelegramUserPrizePermission(req.params.telegramId, req.body.allowedPrizes === true); if (!user) return res.status(404).json({ success: false, error: 'User not found.' }); return res.json({ success: true, user }); }));
 router.get('/admin/categories', adminGuard, asyncRoute(async (req, res) => res.render('admin-categories', { ...getPageContext(req), categories: await dbHandler.getCategories() })));
-router.post('/admin/categories', adminMutationGuard, uploadImage, asyncRoute(async (req, res) => { await dbHandler.createCategory({ name: { en: req.body.nameEn || '', ru: req.body.nameRu || '', ro: req.body.nameRo || '' }, image: imagePath(req), order: req.body.order }); res.json({ success: true, redirect: '/admin/categories' }); }));
-router.post('/admin/categories/:categoryId/update', adminMutationGuard, uploadImage, asyncRoute(async (req, res) => { const payload = { name: { en: req.body.nameEn || '', ru: req.body.nameRu || '', ro: req.body.nameRo || '' }, order: req.body.order }; if (req.file) payload.image = imagePath(req); await dbHandler.updateCategory(req.params.categoryId, payload); res.json({ success: true, redirect: '/admin/categories' }); }));
+router.post('/admin/categories', adminMutationGuard, uploadImage, asyncRoute(async (req, res) => { await dbHandler.createCategory({ name: { en: req.body.nameEn || '', ru: req.body.nameRu || '', ro: req.body.nameRo || '' }, description: { en: req.body.descriptionEn || '', ru: req.body.descriptionRu || '', ro: req.body.descriptionRo || '' }, image: imagePath(req), requiresVideoUrl: req.body.requiresVideoUrl === 'on', order: req.body.order }); res.json({ success: true, redirect: '/admin/categories' }); }));
+router.post('/admin/categories/:categoryId/update', adminMutationGuard, uploadImage, asyncRoute(async (req, res) => { const payload = { name: { en: req.body.nameEn || '', ru: req.body.nameRu || '', ro: req.body.nameRo || '' }, description: { en: req.body.descriptionEn || '', ru: req.body.descriptionRu || '', ro: req.body.descriptionRo || '' }, requiresVideoUrl: req.body.requiresVideoUrl === 'on', order: req.body.order }; if (req.file) payload.image = imagePath(req); await dbHandler.updateCategory(req.params.categoryId, payload); res.json({ success: true, redirect: '/admin/categories' }); }));
 router.post('/admin/categories/:categoryId/delete', adminMutationGuard, asyncRoute(async (req, res) => { await dbHandler.deleteCategory(req.params.categoryId); res.json({ success: true, redirect: '/admin/categories' }); }));
 router.get('/admin/categories/:categoryId/candidates', adminGuard, asyncRoute(async (req, res) => { const category = await dbHandler.getCategoryById(req.params.categoryId); if (!category) return res.status(404).render('error', { message: 'Category not found.' }); return res.render('admin-candidates', { ...getPageContext(req), category, candidates: await dbHandler.getCandidatesByCategory(category.categoryId) }); }));
-router.post('/admin/categories/:categoryId/candidates', adminMutationGuard, uploadImage, asyncRoute(async (req, res) => { await dbHandler.createCandidate({ categoryId: req.params.categoryId, name: req.body.name, description: req.body.description, code: req.body.code, order: req.body.order, image: imagePath(req) }); res.json({ success: true, redirect: categoryPath(req.params.categoryId) }); }));
-router.post('/admin/categories/:categoryId/candidates/:candidateId/update', adminMutationGuard, uploadImage, asyncRoute(async (req, res) => { const payload = { categoryId: req.params.categoryId, name: req.body.name, description: req.body.description, code: req.body.code, order: req.body.order }; if (req.file) payload.image = imagePath(req); await dbHandler.updateCandidate(req.params.candidateId, payload); res.json({ success: true, redirect: categoryPath(req.params.categoryId) }); }));
+router.post('/admin/categories/:categoryId/candidates', adminMutationGuard, uploadImage, asyncRoute(async (req, res) => { await dbHandler.createCandidate({ categoryId: req.params.categoryId, name: req.body.name, description: req.body.description, code: req.body.code, videoUrl: participantVideoUrl(req.body.videoUrl), order: req.body.order, image: imagePath(req) }); res.json({ success: true, redirect: categoryPath(req.params.categoryId) }); }));
+router.post('/admin/categories/:categoryId/candidates/:candidateId/update', adminMutationGuard, uploadImage, asyncRoute(async (req, res) => { const payload = { categoryId: req.params.categoryId, name: req.body.name, description: req.body.description, code: req.body.code, videoUrl: participantVideoUrl(req.body.videoUrl), order: req.body.order }; if (req.file) payload.image = imagePath(req); await dbHandler.updateCandidate(req.params.candidateId, payload); res.json({ success: true, redirect: categoryPath(req.params.categoryId) }); }));
 router.post('/admin/categories/:categoryId/candidates/:candidateId/order', adminMutationGuard, asyncRoute(async (req, res) => { await dbHandler.updateCandidate(req.params.candidateId, { categoryId: req.params.categoryId, order: req.body.order }); res.json({ success: true, redirect: categoryPath(req.params.categoryId) }); }));
 router.post('/admin/categories/:categoryId/candidates/:candidateId/delete', adminMutationGuard, asyncRoute(async (req, res) => { await dbHandler.deleteCandidate(req.params.candidateId, req.params.categoryId); res.json({ success: true, redirect: categoryPath(req.params.categoryId) }); }));
 
