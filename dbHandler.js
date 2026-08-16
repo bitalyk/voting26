@@ -18,6 +18,7 @@ const categorySchema = new Schema({
     description: { type: Schema.Types.Mixed, default: {} },
     image: { type: String, default: '' },
     requiresVideoUrl: { type: Boolean, default: false },
+    requiresHighResImage: { type: Boolean, default: false },
     order: { type: Number, default: () => Date.now() }
 }, { timestamps: true });
 
@@ -28,6 +29,7 @@ const candidateSchema = new Schema({
     description: { type: String, default: '' },
     code: { type: String, default: '' },
     image: { type: String, default: '' },
+    originalImage: { type: String, default: '' },
     videoUrl: { type: String, default: '' },
     order: { type: Number, default: () => Date.now() },
     votes: { type: Number, default: 0 }
@@ -129,6 +131,7 @@ const layoutPanelSchema = new Schema({
 
 const siteConfigSchema = new Schema({
     faviconPath: { type: String, default: '' },
+    publicTheme: { type: String, default: 'classic' },
     mainPageLayout: { type: [layoutPanelSchema], default: [] },
     leaderboardLayout: { type: [layoutPanelSchema], default: [] }
 }, { timestamps: true });
@@ -335,6 +338,7 @@ async function ensureSiteConfig() {
     if (!config) {
         const created = await SiteConfig.create({
             faviconPath: '',
+            publicTheme: 'classic',
             mainPageLayout: cloneLayoutDefaults(MAIN_PAGE_DEFAULTS),
             leaderboardLayout: cloneLayoutDefaults(LEADERBOARD_DEFAULTS)
         });
@@ -484,6 +488,16 @@ module.exports = {
         const faviconPathValue = String(faviconPath || '').trim();
         await SiteConfig.collection.updateOne({ _id: config._id }, { $set: { faviconPath: faviconPathValue, updatedAt } });
         return { ...config, faviconPath: faviconPathValue, updatedAt };
+    },
+
+    updatePublicTheme: async function updatePublicTheme(publicTheme) {
+        const validThemes = new Set(['classic', 'studio', 'night', 'citrus']);
+        const theme = String(publicTheme || '').trim();
+        if (!validThemes.has(theme)) throw new Error('Unsupported public theme.');
+        const config = await ensureSiteConfig();
+        const updatedAt = new Date();
+        await SiteConfig.collection.updateOne({ _id: config._id }, { $set: { publicTheme: theme, updatedAt } });
+        return { ...config, publicTheme: theme, updatedAt };
     },
 
     updateMainPageLayout: async function updateMainPageLayout(panels) {
@@ -730,13 +744,14 @@ module.exports = {
         return Category.findOne({ categoryId }).lean();
     },
 
-    createCategory: async function createCategory({ name, description, image, requiresVideoUrl, order }) {
+    createCategory: async function createCategory({ name, description, image, requiresVideoUrl, requiresHighResImage, order }) {
         const doc = await Category.create({
             categoryId: await generateUniqueFiveDigitId(Category, 'categoryId'),
             name: name || {},
             description: description || {},
             image: image || '',
             requiresVideoUrl: Boolean(requiresVideoUrl),
+            requiresHighResImage: Boolean(requiresHighResImage),
             order: order === undefined || order === '' ? Date.now() : Number(order)
         });
         return doc.toObject();
@@ -762,6 +777,10 @@ module.exports = {
 
         if (payload.requiresVideoUrl !== undefined) {
             category.requiresVideoUrl = Boolean(payload.requiresVideoUrl);
+        }
+
+        if (payload.requiresHighResImage !== undefined) {
+            category.requiresHighResImage = Boolean(payload.requiresHighResImage);
         }
 
         if (payload.order !== undefined && payload.order !== null) {
@@ -812,6 +831,7 @@ module.exports = {
             description: payload.description || '',
             code: payload.code || '',
             image: payload.image || '',
+            originalImage: payload.originalImage || '',
             videoUrl: String(payload.videoUrl || '').trim(),
             order: payload.order === undefined || payload.order === '' ? Date.now() : Number(payload.order),
             votes: 0
@@ -860,8 +880,12 @@ module.exports = {
             candidate.code = payload.code;
         }
 
-        if (payload.image) {
+        if (payload.image !== undefined) {
             candidate.image = payload.image;
+        }
+
+        if (payload.originalImage !== undefined) {
+            candidate.originalImage = payload.originalImage;
         }
 
         if (payload.videoUrl !== undefined) {
@@ -1063,7 +1087,16 @@ module.exports = {
         if (!user) {
             return { valid: false, reason: 'Telegram user does not exist' };
         }
-        return { valid: true, voted: !!user.voted, data: user.toObject() };
+
+        const categories = await Category.find({}).select('categoryId').lean();
+        const votedCategoryIds = new Set(user.votedCategories || []);
+        const hasVotedEveryCategory = categories.length > 0 && categories.every((category) => votedCategoryIds.has(category.categoryId));
+        if (user.voted !== hasVotedEveryCategory) {
+            user.voted = hasVotedEveryCategory;
+            await user.save();
+        }
+
+        return { valid: true, voted: hasVotedEveryCategory, data: user.toObject() };
     },
 
     isVotingOpen: async function isVotingOpen() {
@@ -1133,8 +1166,8 @@ module.exports = {
 
         const votedAt = new Date();
         const claimedUser = await TelegramUser.findOneAndUpdate(
-            { telegramId: normalizedId, voted: false, votedCategories: { $ne: categoryId } },
-            { $addToSet: { votedCategories: categoryId }, $set: { votedAt } },
+            { telegramId: normalizedId, votedCategories: { $ne: categoryId } },
+            { $addToSet: { votedCategories: categoryId }, $set: { votedAt, voted: false } },
             { new: true }
         );
 
@@ -1144,11 +1177,10 @@ module.exports = {
 
         try {
             await Candidate.updateOne({ categoryId, candidateId }, { $inc: { votes: 1 } });
-            const hasVotedEveryCategory = allCategories.every((entry) => claimedUser.votedCategories.includes(entry.categoryId));
-            if (hasVotedEveryCategory) {
-                claimedUser.voted = true;
-                await claimedUser.save();
-            }
+            const votedCategoryIds = new Set(claimedUser.votedCategories);
+            const hasVotedEveryCategory = allCategories.length > 0 && allCategories.every((entry) => votedCategoryIds.has(entry.categoryId));
+            claimedUser.voted = hasVotedEveryCategory;
+            await claimedUser.save();
         } catch (error) {
             await TelegramUser.updateOne(
                 { _id: claimedUser._id, votedAt },

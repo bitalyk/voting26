@@ -23,7 +23,7 @@
             <div><h2 class="font-bold text-white"><%= category.name.en || category.name.ru || category.name.ro || 'Untitled category' %></h2><p class="mt-1 text-xs text-slate-400">ID: <%= category.categoryId %> | Order: <%= category.order %></p></div>
           </div>
           <div class="flex flex-wrap gap-2">
-            <button type="button" class="edit-category rounded-lg border border-slate-500 px-3 py-2 text-sm font-semibold" data-id="<%= category.categoryId %>" data-name-en="<%= category.name.en || '' %>" data-name-ru="<%= category.name.ru || '' %>" data-name-ro="<%= category.name.ro || '' %>" data-description-en="<%= category.description?.en || '' %>" data-description-ru="<%= category.description?.ru || '' %>" data-description-ro="<%= category.description?.ro || '' %>" data-requires-video-url="<%= category.requiresVideoUrl ? 'true' : 'false' %>" data-order="<%= category.order %>">Edit</button>
+            <button type="button" class="edit-category rounded-lg border border-slate-500 px-3 py-2 text-sm font-semibold" data-id="<%= category.categoryId %>" data-name-en="<%= category.name.en || '' %>" data-name-ru="<%= category.name.ru || '' %>" data-name-ro="<%= category.name.ro || '' %>" data-description-en="<%= category.description?.en || '' %>" data-description-ru="<%= category.description?.ru || '' %>" data-description-ro="<%= category.description?.ro || '' %>" data-requires-video-url="<%= category.requiresVideoUrl ? 'true' : 'false' %>" data-requires-high-res-image="<%= category.requiresHighResImage ? 'true' : 'false' %>" data-order="<%= category.order %>">Edit</button>
             <a href="/admin/categories/<%= encodeURIComponent(category.categoryId) %>/candidates" class="rounded-lg bg-sky-400 px-3 py-2 text-sm font-bold text-slate-950">Manage Candidates</a>
             <form method="POST" action="/admin/categories/<%= encodeURIComponent(category.categoryId) %>/delete" onsubmit="return confirm('Delete this category and all of its candidates?');"><button class="rounded-lg border border-red-500/50 px-3 py-2 text-sm font-semibold text-red-200">Delete</button></form>
           </div>
@@ -44,6 +44,7 @@
         <label class="text-sm">Description (Russian)<textarea name="descriptionRu" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white"></textarea></label>
         <label class="text-sm">Description (Romanian)<textarea name="descriptionRo" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white"></textarea></label>
         <label class="flex items-center gap-2 text-sm"><input name="requiresVideoUrl" type="checkbox" /> Require Video URL for Participants</label>
+        <label class="flex items-center gap-2 text-sm"><input name="requiresHighResImage" type="checkbox" /> <%= t.enableHighQualityImages %></label>
         <label class="text-sm">Order position (optional)<input name="order" type="number" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white" /></label>
         <button class="mt-2 rounded-lg bg-emerald-400 px-4 py-2.5 font-bold text-slate-950">Create category</button>
       </div>
@@ -63,6 +64,7 @@
         <label class="text-sm">Description (Russian)<textarea id="editDescriptionRu" name="descriptionRu" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white"></textarea></label>
         <label class="text-sm">Description (Romanian)<textarea id="editDescriptionRo" name="descriptionRo" class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white"></textarea></label>
         <label class="flex items-center gap-2 text-sm"><input id="editRequiresVideoUrl" name="requiresVideoUrl" type="checkbox" /> Require Video URL for Participants</label>
+        <label class="flex items-center gap-2 text-sm"><input id="editRequiresHighResImage" name="requiresHighResImage" type="checkbox" /> <%= t.enableHighQualityImages %></label>
         <label class="text-sm">Order position<input id="editOrder" name="order" type="number" required class="mt-1 w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-white" /></label>
         <button class="mt-2 rounded-lg bg-emerald-400 px-4 py-2.5 font-bold text-slate-950">Save category</button>
       </div>
@@ -94,6 +96,7 @@
       document.getElementById('editDescriptionRu').value = button.dataset.descriptionRu;
       document.getElementById('editDescriptionRo').value = button.dataset.descriptionRo;
       document.getElementById('editRequiresVideoUrl').checked = button.dataset.requiresVideoUrl === 'true';
+      document.getElementById('editRequiresHighResImage').checked = button.dataset.requiresHighResImage === 'true';
       document.getElementById('editOrder').value = button.dataset.order;
       showModal('editModal');
     });

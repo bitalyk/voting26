@@ -1,7 +1,8 @@
 # Dependencies
 node_modules/
-
+references/
 public/
+
 # Logs
 logs
 *.log

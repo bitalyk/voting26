@@ -7,6 +7,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const session = require('express-session');
 const multer = require('multer');
+const sharp = require('sharp');
 const routes = require('./routes');
 const dbHandler = require('./dbHandler');
 
@@ -32,7 +33,11 @@ function verifyAdminBearer(req, res, next) {
 }
 
 const uploadDirectory = path.join(__dirname, 'public', 'uploads');
+const candidateOriginalDirectory = path.join(uploadDirectory, 'candidates', 'original');
+const candidateThumbnailDirectory = path.join(uploadDirectory, 'candidates', 'thumbnails');
 fs.mkdirSync(uploadDirectory, { recursive: true });
+fs.mkdirSync(candidateOriginalDirectory, { recursive: true });
+fs.mkdirSync(candidateThumbnailDirectory, { recursive: true });
 
 const storage = multer.diskStorage({
     destination: (_req, _file, callback) => callback(null, uploadDirectory),
@@ -67,8 +72,58 @@ const faviconUpload = multer({
     fileFilter: imageFileFilter
 });
 
+const candidateImageExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp']);
+const candidateImageMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
+
+function candidateImageFileFilter(_req, file, callback) {
+    const extension = path.extname(file.originalname).toLowerCase();
+    if (!candidateImageExtensions.has(extension) || !candidateImageMimeTypes.has(file.mimetype)) {
+        const error = new Error('Unsupported image format.');
+        error.code = 'UNSUPPORTED_IMAGE_FORMAT';
+        return callback(error);
+    }
+    return callback(null, true);
+}
+
+const candidateUpload = multer({
+    storage: multer.diskStorage({
+        destination: (_req, _file, callback) => callback(null, candidateOriginalDirectory),
+        filename: (_req, file, callback) => {
+            const safeName = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}${path.extname(file.originalname).toLowerCase()}`;
+            callback(null, safeName);
+        }
+    }),
+    limits: { fileSize: 25 * 1024 * 1024 },
+    fileFilter: candidateImageFileFilter
+});
+
+async function processCandidateImage(file) {
+    if (!file) return {};
+
+    const thumbnailFilename = `${path.parse(file.filename).name}.webp`;
+    const thumbnailPath = path.join(candidateThumbnailDirectory, thumbnailFilename);
+    try {
+        await sharp(file.path, { limitInputPixels: 100000000 })
+            .rotate()
+            .resize({ width: 600, withoutEnlargement: true })
+            .webp({ quality: 82 })
+            .toFile(thumbnailPath);
+    } catch (error) {
+        await Promise.allSettled([fs.promises.unlink(file.path), fs.promises.unlink(thumbnailPath)]);
+        error.code = error.code || 'IMAGE_PROCESSING_FAILED';
+        throw error;
+    }
+
+    return {
+        image: `/uploads/candidates/thumbnails/${thumbnailFilename}`,
+        originalImage: `/uploads/candidates/original/${file.filename}`
+    };
+}
+
 app.locals.upload = upload;
 app.locals.faviconUpload = faviconUpload;
+app.locals.candidateUpload = candidateUpload;
+app.locals.processCandidateImage = processCandidateImage;
 app.locals.adminBearerToken = adminBearerToken;
 app.locals.verifyAdminBearer = verifyAdminBearer;
 app.set('view engine', 'ejs');
@@ -83,6 +138,24 @@ app.get('/favicon.ico', async (req, res, next) => {
         if (!faviconFile || !fs.existsSync(faviconFile)) return res.status(204).end();
         res.set('Cache-Control', 'no-store');
         return res.sendFile(faviconFile);
+    } catch (error) {
+        return next(error);
+    }
+});
+
+app.get('/public-theme.css', async (req, res, next) => {
+    try {
+        const siteConfig = await dbHandler.getSiteConfig();
+        const publicTheme = ['classic', 'studio', 'night', 'citrus'].includes(siteConfig.publicTheme) ? siteConfig.publicTheme : 'classic';
+        const themeFiles = {
+            classic: [],
+            studio: ['gocon-theme.css'],
+            night: ['gocon-theme.css', 'themes/night.css'],
+            citrus: ['gocon-theme.css', 'themes/citrus.css']
+        }[publicTheme];
+        const styles = await Promise.all(themeFiles.map((file) => fs.promises.readFile(path.join(__dirname, 'public', file), 'utf8')));
+        res.set('Cache-Control', 'no-store');
+        return res.type('text/css').send(styles.join('\n'));
     } catch (error) {
         return next(error);
     }
@@ -108,13 +181,17 @@ app.use('/', routes);
 
 app.use((error, req, res, next) => {
     if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {
-        return res.status(413).json({ success: false, code: 'FILE_TOO_LARGE', error: 'File is too large! Please upload an image smaller than 5MB.' });
+        const isCandidateUpload = req.path.includes('/candidates');
+        return res.status(413).json({ success: false, code: 'FILE_TOO_LARGE', error: isCandidateUpload ? 'File exceeds maximum limit of 25MB.' : 'File is too large! Please upload an image smaller than 5MB.' });
     }
     if (error && error.code === 'UNSUPPORTED_IMAGE_FORMAT') {
         return res.status(415).json({ success: false, code: 'UNSUPPORTED_IMAGE_FORMAT', error: 'Unsupported image format! Please use PNG, JPG, WEBP, or SVG.' });
     }
     if (error instanceof multer.MulterError) {
         return res.status(400).json({ success: false, error: error.message });
+    }
+    if (error && error.code === 'IMAGE_PROCESSING_FAILED') {
+        return res.status(422).json({ success: false, code: 'IMAGE_PROCESSING_FAILED', error: 'The uploaded image could not be processed.' });
     }
     return next(error);
 });
