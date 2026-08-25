@@ -1,0 +1,26 @@
+/* Stardust Gala: near-black navy with periwinkle, dusty rose, and gold accents (10th anniversary poster palette). */
+:root {
+  --color-primary: #d98aa8;
+  --color-primary-dark: #b5688a;
+  --color-accent: #5b6fc9;
+  --color-accent-strong: #414f9e;
+  --color-lime: #7fa8c9;
+  --color-gold: #f0a83c;
+  --color-violet: #8f7bc9;
+  --color-bg: #0b0e1a;
+  --color-surface: #131a30;
+  --color-surface-muted: #1c2542;
+  --color-text-main: #f5f6fa;
+  --color-text-muted: #9aa3c2;
+  --color-border: #2b3560;
+  --shadow-card: 0 16px 36px rgba(3, 6, 20, .55);
+}
+
+html { background: var(--color-bg); }
+body { background: radial-gradient(120% 140% at 85% 0%, #182352 0%, #0f1428 45%, #0b0e1a 100%) !important; }
+.bg-slate-900, .bg-slate-900\/80, .bg-slate-900\/60, .bg-slate-900\/50, .glass { background: var(--color-surface) !important; }
+.bg-slate-800, .bg-slate-800\/70, .bg-slate-800\/60 { background: var(--color-surface-muted) !important; }
+.text-white, .text-slate-100, .text-slate-200, .text-slate-300 { color: var(--color-text-main) !important; }
+input, select, textarea { background: #0f1530 !important; color: var(--color-text-main) !important; }
+main > header.glass { background: #0a0d19 !important; border-color: var(--color-border) !important; }
+main > header.glass::after { border-color: rgba(240, 168, 60, .8); }

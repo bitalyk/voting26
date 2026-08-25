@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const express = require('express');
 const dbHandler = require('./dbHandler');
+const themes = require('./themes');
 
 const router = express.Router();
 const LANGUAGES = ['en', 'ru', 'ro'];
@@ -186,7 +187,7 @@ router.post('/admin/logout', adminMutationGuard, (req, res) => req.session.destr
 router.get('/admin', adminGuard, asyncRoute(async (req, res) => res.render('admin-settings', { ...getPageContext(req), isLoggedIn: true, settings: await dbHandler.getSettings(), errorMessage: '' })));
 router.post('/admin/settings', adminMutationGuard, asyncRoute(async (req, res) => { await dbHandler.updateSettings({ votingStartTimestamp: req.body.votingStartTimestamp, leaderboardShowTimestamp: req.body.leaderboardShowTimestamp, showSoonText: req.body.showSoonText === 'on', allowTestVoting: req.body.allowTestVoting === 'on', allowTestLeaderboard: req.body.allowTestLeaderboard === 'on' }); res.json({ success: true, redirect: '/admin' }); }));
 
-router.get('/admin/graphics', adminGuard, asyncRoute(async (req, res) => res.render('admin-graphics', { ...getPageContext(req), siteConfig: await dbHandler.getSiteConfig() })));
+router.get('/admin/graphics', adminGuard, asyncRoute(async (req, res) => res.render('admin-graphics', { ...getPageContext(req), siteConfig: await dbHandler.getSiteConfig(), themes })));
 router.post('/admin/graphics/favicon', adminMutationGuard, uploadFavicon, asyncRoute(async (req, res) => {
     if (!req.file) return res.status(400).json({ success: false, error: 'Choose a favicon file to upload.' });
     await dbHandler.updateFaviconPath(`/uploads/${req.file.filename}`);

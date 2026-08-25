@@ -9,7 +9,7 @@
 			<form id="faviconForm" method="POST" action="/admin/graphics/favicon" enctype="multipart/form-data" class="space-y-4"><label class="block text-sm font-medium">Favicon file<input name="favicon" type="file" required accept=".jpg,.jpeg,.png,.gif,.webp,.svg" class="mt-2 block w-full text-sm text-slate-300" /></label><p class="text-xs text-slate-400">PNG, JPG, GIF, WEBP, or SVG. Maximum file size: 5 MB.</p><button class="rounded-lg bg-fuchsia-400 px-4 py-2.5 font-bold text-slate-950">Upload favicon</button></form>
 		</section>
 
-		<% const publicTheme = siteConfig.publicTheme || 'classic'; const themes = [{ id: 'classic', name: 'Classic', description: 'Original GoCon interface', colors: ['#0f172a', '#38bdf8', '#ffffff'] }, { id: 'studio', name: 'Studio', description: 'Clean editorial festival look', colors: ['#f5f6f8', '#087f8c', '#df3f73'] }, { id: 'night', name: 'Night Pulse', description: 'Dark event mode with neon accents', colors: ['#111319', '#62d9d0', '#ff4f8b'] }, { id: 'citrus', name: 'Citrus Pop', description: 'Warm playful daytime palette', colors: ['#fffaf1', '#234a45', '#e95836'] }]; %>
+		<% const publicTheme = siteConfig.publicTheme || 'classic'; %>
 		<section class="mt-6 rounded-xl border border-slate-700 bg-slate-900 p-5 shadow-xl">
 			<div><h2 class="text-xl font-bold text-white">Public Theme</h2><p class="mt-1 text-sm text-slate-400">Applied to the public site only. Changes take effect on the next page load.</p></div>
 			<form id="themeForm" method="POST" action="/admin/graphics/theme" class="mt-5">

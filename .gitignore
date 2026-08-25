@@ -1,7 +1,9 @@
 # Dependencies
 node_modules/
 references/
-public/
+
+# User-uploaded content (favicons, candidate photos, etc.) - not versioned
+public/uploads/
 
 # Logs
 logs

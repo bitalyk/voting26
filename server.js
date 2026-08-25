@@ -10,6 +10,7 @@ const multer = require('multer');
 const sharp = require('sharp');
 const routes = require('./routes');
 const dbHandler = require('./dbHandler');
+const themes = require('./themes');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -146,14 +147,8 @@ app.get('/favicon.ico', async (req, res, next) => {
 app.get('/public-theme.css', async (req, res, next) => {
     try {
         const siteConfig = await dbHandler.getSiteConfig();
-        const publicTheme = ['classic', 'studio', 'night', 'citrus'].includes(siteConfig.publicTheme) ? siteConfig.publicTheme : 'classic';
-        const themeFiles = {
-            classic: [],
-            studio: ['gocon-theme.css'],
-            night: ['gocon-theme.css', 'themes/night.css'],
-            citrus: ['gocon-theme.css', 'themes/citrus.css']
-        }[publicTheme];
-        const styles = await Promise.all(themeFiles.map((file) => fs.promises.readFile(path.join(__dirname, 'public', file), 'utf8')));
+        const theme = themes.find((entry) => entry.id === siteConfig.publicTheme) || themes[0];
+        const styles = await Promise.all(theme.files.map((file) => fs.promises.readFile(path.join(__dirname, 'public', file), 'utf8')));
         res.set('Cache-Control', 'no-store');
         return res.type('text/css').send(styles.join('\n'));
     } catch (error) {

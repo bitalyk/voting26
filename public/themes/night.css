@@ -1,0 +1,26 @@
+/* Night Aurora: deep charcoal-navy base with a coral/teal complementary duo. */
+:root {
+  --color-primary: #ff7a59;
+  --color-primary-dark: #e15a3a;
+  --color-accent: #4fd1c5;
+  --color-accent-strong: #38b2ac;
+  --color-lime: #8bd17c;
+  --color-gold: #f2c14e;
+  --color-violet: #9f8fef;
+  --color-bg: #0b0f14;
+  --color-surface: #141a21;
+  --color-surface-muted: #1c232c;
+  --color-text-main: #eef1f5;
+  --color-text-muted: #9aa5b1;
+  --color-border: #2a3138;
+  --shadow-card: 0 14px 32px rgba(0, 0, 0, .32);
+}
+
+html { background: var(--color-bg); }
+body { background: radial-gradient(120% 140% at 15% 0%, #182029 0%, #0e1319 55%, #0b0f14 100%) !important; }
+.bg-slate-900, .bg-slate-900\/80, .bg-slate-900\/60, .bg-slate-900\/50, .glass { background: var(--color-surface) !important; }
+.bg-slate-800, .bg-slate-800\/70, .bg-slate-800\/60 { background: var(--color-surface-muted) !important; }
+.text-white, .text-slate-100, .text-slate-200, .text-slate-300 { color: var(--color-text-main) !important; }
+input, select, textarea { background: #10151b !important; color: var(--color-text-main) !important; }
+main > header.glass { background: #0e1319 !important; border-color: var(--color-border) !important; }
+main > header.glass::after { border-color: rgba(79, 209, 197, .55); }

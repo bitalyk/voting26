@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const mongoose = require('mongoose');
+const themes = require('./themes');
 
 const { Schema } = mongoose;
 
@@ -491,7 +492,7 @@ module.exports = {
     },
 
     updatePublicTheme: async function updatePublicTheme(publicTheme) {
-        const validThemes = new Set(['classic', 'studio', 'night', 'citrus']);
+        const validThemes = new Set(themes.map((entry) => entry.id));
         const theme = String(publicTheme || '').trim();
         if (!validThemes.has(theme)) throw new Error('Unsupported public theme.');
         const config = await ensureSiteConfig();
